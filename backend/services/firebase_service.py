@@ -10,6 +10,7 @@ def initialize_firebase():
     global _db, _bucket
     try:
         if not firebase_admin._apps:
+            print(f"Initializing Firebase with credentials from: {settings.FIREBASE_CREDENTIALS_PATH}")
             if os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
                 firebase_admin.initialize_app(cred, {
@@ -18,13 +19,29 @@ def initialize_firebase():
                 print("Firebase initialized successfully.")
             else:
                 print(f"Warning: Firebase credentials not found at {settings.FIREBASE_CREDENTIALS_PATH}")
-                return False
+                # Try relative path as fallback
+                fallback_path = "firebase-credentials.json"
+                if os.path.exists(fallback_path):
+                     print(f"Found credentials at fallback path: {fallback_path}")
+                     cred = credentials.Certificate(fallback_path)
+                     firebase_admin.initialize_app(cred, {
+                        'storageBucket': settings.FIREBASE_STORAGE_BUCKET
+                     })
+                else:
+                    return False
         
         _db = firestore.client()
-        _bucket = storage.bucket()
+        try:
+             _bucket = storage.bucket()
+        except Exception as e:
+             print(f"Warning: Could not get storage bucket: {e}")
+             _bucket = None
+             
         return True
     except Exception as e:
         print(f"Failed to initialize Firebase: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def get_db():
@@ -60,7 +77,10 @@ def check_firebase_connection():
             db = get_db()
             if db:
                 # Try to list collections (empty list is fine, just checking connectivity)
-                list(db.collections(limit=1)) 
+                # Note: collections() returns a generator/iterator
+                cols = db.collections()
+                # Just try to get the first one to verify access
+                next(cols, None)
                 status["firestore"] = "connected"
             else:
                 status["firestore"] = "not_initialized"

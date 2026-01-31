@@ -20,12 +20,13 @@ def check_ai_connection():
         
         # Simple test to list models or generate a tiny content
         # Listing models is a good connectivity check
-        # We'll try to list one model
-        models = list(client.models.list(config={"limit": 1}))
+        # We'll iterate to get just one model to verify access
+        models_iter = client.models.list()
+        first_model = next(models_iter, None)
         
         status["initialized"] = True
         status["connectivity"] = "connected"
-        status["details"] = f"Successfully listed {len(models)} models"
+        status["details"] = f"Successfully connected. Found model: {first_model.name if first_model else 'None'}"
         
     except Exception as e:
         status["connectivity"] = "failed"
