@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import Layout from '../components/Layout';
+import { useNavigate } from 'react-router-dom';
 
 const API_BASE = 'http://localhost:8000/api/v1';
 
 const Observe = () => {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -158,7 +161,7 @@ const Observe = () => {
         
         setIsCompleted(true);
         // Navigate to Decide phase
-        window.location.href = '/decide'; 
+        navigate('/decide');
     } catch (e) {
         setError(e.message);
     } finally {
@@ -167,6 +170,7 @@ const Observe = () => {
   };
 
   return (
+    <Layout currentStep={0}>
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-6 text-center">Observe Phase: Body Analysis</h1>
       
@@ -259,7 +263,9 @@ const Observe = () => {
                         
                         {isCompleted && (
                             <div className="card-actions justify-end mt-6">
-                                <button className="btn btn-disabled w-full">Progress Saved</button>
+                                <button className="btn btn-primary w-full" onClick={() => navigate('/decide')}>
+                                    Go to Decision Phase →
+                                </button>
                             </div>
                         )}
                     </div>
@@ -268,6 +274,7 @@ const Observe = () => {
         </div>
       </div>
     </div>
+    </Layout>
   );
 };
 

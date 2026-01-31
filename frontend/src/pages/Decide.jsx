@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import Layout from '../components/Layout';
 
 const API_BASE = 'http://localhost:8000/api/v1';
 
@@ -13,6 +14,7 @@ const Decide = () => {
   const [recommendation, setRecommendation] = useState(null);
   const [error, setError] = useState(null);
   const [committed, setCommitted] = useState(false);
+  const [selectedPath, setSelectedPath] = useState(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -29,7 +31,7 @@ const Decide = () => {
         const data = await res.json();
         if (data.decideCompleted && data.selectedPath) {
              setCommitted(true);
-             // Could redirect to next phase if it existed
+             setSelectedPath(data.selectedPath);
         }
         if (data.generatedImages) {
              setImages(data.generatedImages);
@@ -71,7 +73,9 @@ const Decide = () => {
   };
 
   const handleSelectPath = async (pathKey) => {
-    if (!window.confirm(`Are you sure you want to commit to the ${pathKey} path?`)) return;
+    if (committed && selectedPath === pathKey) return; // Already selected this one
+    
+    if (!window.confirm(`Are you sure you want to ${committed ? 'switch' : 'commit'} to the ${pathKey} path?`)) return;
     
     try {
       const token = await currentUser.getIdToken();
@@ -91,7 +95,8 @@ const Decide = () => {
       if (!res.ok) throw new Error("Failed to commit path");
       
       setCommitted(true);
-      alert("Path confirmed! You have completed the Decision phase.");
+      setSelectedPath(pathKey);
+      alert("Path updated! You have completed the Decision phase.");
       
     } catch (err) {
       setError(err.message);
@@ -100,24 +105,23 @@ const Decide = () => {
 
   if (loading) return <div className="p-8 text-center"><span className="loading loading-spinner loading-lg"></span></div>;
 
-  if (committed) {
-      return (
-          <div className="hero min-h-screen bg-base-200">
-              <div className="hero-content text-center">
-                  <div className="max-w-md">
-                      <h1 className="text-5xl font-bold text-success">Path Chosen!</h1>
-                      <p className="py-6">You have successfully committed to your transformation path. The next phase (Planning) is coming soon.</p>
-                      <button className="btn btn-primary" onClick={() => navigate('/observe')}>Back to Observe</button>
-                  </div>
-              </div>
-          </div>
-      );
-  }
-
   return (
+    <Layout currentStep={1}>
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-2 text-center">Decide Your Path</h1>
       <p className="text-center text-gray-500 mb-8">Choose the physique you want to work towards.</p>
+
+      {committed && (
+          <div className="alert alert-success mb-6 shadow-lg">
+              <div>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <div>
+                    <h3 className="font-bold">Path Selected: {selectedPath.toUpperCase()}</h3>
+                    <div className="text-xs">You can still change your mind by selecting a different path below.</div>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {error && <div className="alert alert-error mb-6"><span>{error}</span></div>}
 
@@ -163,23 +167,26 @@ const Decide = () => {
         {images.map((img, idx) => {
             // If AI recommended this, highlight it
             const isRecommended = recommendation?.recommendation?.suggested_path === img.goal;
+            const isSelected = selectedPath === img.goal;
             
             return (
-                <div key={idx} className={`card bg-base-100 shadow-xl transition-all hover:scale-105 ${isRecommended ? 'ring-4 ring-secondary ring-offset-2' : ''}`}>
+                <div key={idx} className={`card bg-base-100 shadow-xl transition-all hover:scale-105 ${isSelected ? 'ring-4 ring-success ring-offset-2 scale-105' : isRecommended ? 'ring-4 ring-secondary ring-offset-2' : ''}`}>
                     <figure className="px-4 pt-4">
                         <img src={img.url} alt={img.goal} className="rounded-xl w-full h-64 object-cover" />
                     </figure>
                     <div className="card-body items-center text-center">
                         <h2 className="card-title capitalize">
                             {img.goal}
-                            {isRecommended && <div className="badge badge-secondary">Recommended</div>}
+                            {isRecommended && <div className="badge badge-secondary">AI Pick</div>}
+                            {isSelected && <div className="badge badge-success">Selected</div>}
                         </h2>
                         <div className="card-actions mt-4">
                             <button 
-                                className={`btn ${isRecommended ? 'btn-secondary' : 'btn-primary'} w-full`}
+                                className={`btn ${isSelected ? 'btn-success' : isRecommended ? 'btn-secondary' : 'btn-primary'} w-full`}
                                 onClick={() => handleSelectPath(img.goal)}
+                                disabled={isSelected}
                             >
-                                Select This Path
+                                {isSelected ? "Selected" : "Select This Path"}
                             </button>
                         </div>
                     </div>
@@ -188,6 +195,7 @@ const Decide = () => {
         })}
       </div>
     </div>
+    </Layout>
   );
 };
 
