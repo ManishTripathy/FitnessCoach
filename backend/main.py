@@ -28,8 +28,10 @@ app.add_middleware(
 
 # Include routers
 app.include_router(connectivity.router, prefix="/api/v1", tags=["connectivity"])
-from backend.api.routers import observe
+from backend.api.routers import observe, decide
 app.include_router(observe.router, prefix="/api/v1", tags=["observe"])
+app.include_router(decide.router, prefix="/api/v1", tags=["decide"])
+
 
 @app.get("/")
 async def root():

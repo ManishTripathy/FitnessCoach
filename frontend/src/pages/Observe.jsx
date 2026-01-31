@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { storage } from '../firebase';
-import { ref, uploadBytes } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const API_BASE = 'http://localhost:8000/api/v1';
 
@@ -14,6 +14,44 @@ const Observe = () => {
   const [analysis, setAnalysis] = useState(null);
   const [futureImages, setFutureImages] = useState([]);
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  // Load saved state on mount
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const fetchState = async () => {
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`${API_BASE}/decide/state`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.observeCompleted) {
+                    setIsCompleted(true);
+                    setAnalysis(data.analysis);
+                    setFutureImages(data.generatedImages);
+                    
+                    // Load original image preview
+                    if (data.originalImage) {
+                        try {
+                            const url = await getDownloadURL(ref(storage, data.originalImage));
+                            setPreview(url);
+                        } catch (e) {
+                            console.error("Failed to load original image:", e);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load state:", err);
+        }
+    };
+    
+    fetchState();
+  }, [currentUser]);
 
   const handleImageChange = (e) => {
     if (e.target.files[0]) {
@@ -96,6 +134,37 @@ const Observe = () => {
     }
   };
 
+  const handleContinue = async () => {
+    if (!currentUser || !analysis || futureImages.length === 0) return;
+    setSaving(true);
+    try {
+        const token = await currentUser.getIdToken();
+        const storagePath = `users/${currentUser.uid}/observe/original.jpg`;
+        
+        const res = await fetch(`${API_BASE}/decide/save`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                original_image_path: storagePath,
+                analysis: analysis,
+                generated_images: futureImages
+            })
+        });
+        
+        if (!res.ok) throw new Error("Failed to save progress");
+        
+        setIsCompleted(true);
+        // In future, this would navigate to next feature
+    } catch (e) {
+        setError(e.message);
+    } finally {
+        setSaving(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-6 text-center">Observe Phase: Body Analysis</h1>
@@ -105,28 +174,39 @@ const Observe = () => {
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <h2 className="card-title">1. Upload Your Photo</h2>
+            {isCompleted && (
+                <div className="alert alert-success mb-4">
+                    <span>Progress Saved! Upload a new photo to start over.</span>
+                </div>
+            )}
+            
             <p className="text-sm text-gray-500">Upload a full-body front-facing photo.</p>
             <input 
-              type="file" 
-              className="file-input file-input-bordered file-input-primary w-full max-w-xs" 
-              accept="image/*"
-              onChange={handleImageChange}
+                type="file" 
+                className="file-input file-input-bordered file-input-primary w-full max-w-xs" 
+                accept="image/*"
+                onChange={handleImageChange}
+                disabled={loading || genLoading}
             />
+            
             {preview && (
               <div className="mt-4 flex justify-center bg-base-200 p-4 rounded-xl">
                 <img src={preview} alt="Preview" className="rounded-lg max-h-80 object-contain" />
               </div>
             )}
             {error && <div className="alert alert-error mt-4"><span>{error}</span></div>}
-            <div className="card-actions justify-end mt-4">
-              <button 
-                className="btn btn-primary w-full" 
-                onClick={handleUploadAndAnalyze}
-                disabled={!image || loading || genLoading}
-              >
-                {loading ? <span className="loading loading-spinner"></span> : "Analyze & Generate"}
-              </button>
-            </div>
+            
+            {!isCompleted && (
+                <div className="card-actions justify-end mt-4">
+                  <button 
+                    className="btn btn-primary w-full" 
+                    onClick={handleUploadAndAnalyze}
+                    disabled={!image || loading || genLoading}
+                  >
+                    {loading ? <span className="loading loading-spinner"></span> : "Analyze & Generate"}
+                  </button>
+                </div>
+            )}
           </div>
         </div>
 
@@ -162,6 +242,25 @@ const Observe = () => {
                                 </div>
                             ))}
                         </div>
+                        
+                        {/* Continue Button */}
+                        {!isCompleted && !genLoading && futureImages.length > 0 && (
+                            <div className="card-actions justify-end mt-6">
+                                <button 
+                                    className="btn btn-accent btn-lg w-full"
+                                    onClick={handleContinue}
+                                    disabled={saving}
+                                >
+                                    {saving ? <span className="loading loading-spinner"></span> : "Continue & Save Progress"}
+                                </button>
+                            </div>
+                        )}
+                        
+                        {isCompleted && (
+                            <div className="card-actions justify-end mt-6">
+                                <button className="btn btn-disabled w-full">Progress Saved</button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
