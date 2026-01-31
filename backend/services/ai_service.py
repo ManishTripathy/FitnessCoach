@@ -1,5 +1,8 @@
 from google import genai
+from google.genai import types
 from backend.core.config import settings
+import json
+import base64
 
 def check_ai_connection():
     status = {
@@ -33,3 +36,103 @@ def check_ai_connection():
         status["error"] = str(e)
         
     return status
+
+def _get_client():
+    if not settings.GOOGLE_API_KEY:
+        raise ValueError("GOOGLE_API_KEY is not set")
+    return genai.Client(api_key=settings.GOOGLE_API_KEY)
+
+def analyze_body_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
+    client = _get_client()
+    
+    prompt = """
+    You are an expert fitness coach. Analyze this body photo to estimate a high-level body category.
+    Category Definitions:
+    - Lean: Clearly visible muscle definition, low body fat.
+    - Average: Moderate body fat, some muscle definition, healthy appearance.
+    - Overfat: Higher body fat percentage, limited muscle visibility.
+    
+    Output JSON with 'category' (Lean|Average|Overfat) and 'reasoning'.
+    Do NOT provide medical advice.
+    """
+    
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part(inline_data=types.Blob(mime_type=mime_type, data=image_bytes)),
+                    types.Part(text=prompt)
+                ]
+            )
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json"
+        )
+    )
+    
+    try:
+        return json.loads(response.text)
+    except Exception as e:
+        return {"category": "Unknown", "reasoning": f"Failed to parse AI response: {response.text}"}
+
+def _decode_inline_data(data: object) -> bytes:
+    if isinstance(data, bytes):
+        return data
+    if isinstance(data, str):
+        return base64.b64decode(data)
+    raise ValueError("Unsupported inline data format from model response")
+
+def _extract_image_from_response(response) -> bytes:
+    if not response or not getattr(response, "candidates", None):
+        raise ValueError("Model returned no candidates")
+    for candidate in response.candidates:
+        content = getattr(candidate, "content", None)
+        if not content or not getattr(content, "parts", None):
+            continue
+        for part in content.parts:
+            inline = getattr(part, "inline_data", None)
+            if inline and getattr(inline, "data", None):
+                return _decode_inline_data(inline.data)
+    raise ValueError("Model returned no image data")
+
+def generate_future_physique(image_bytes: bytes, goal_key: str, mime_type: str = "image/jpeg") -> bytes:
+    client = _get_client()
+    
+    # Goal prompts map
+    goals = {
+        "lean": "a Lean & Toned fitness model physique. Target 8-10% body fat. Visible six-pack abs, defined oblique muscles, tight waist. No excess fat. The look of a calisthenics athlete or boxer. Sharp definition.",
+        "athletic": "a Fit & Athletic physique. Broad shoulders, V-shaped torso, flat stomach with visible muscle tone. Well-developed chest and arms. The look of a competitive swimmer or decathlete. Healthy, capable, and strong, but not overly bulky.",
+        "muscle": "a Muscular & Powerful physique. Significant natural muscle mass. Large chest, thick arms, and strong legs. Target 12-15% body fat (visible abs but not shredded). The look of a superhero actor or rugby player. Impressive size but realistic proportions."
+    }
+    
+    goal_desc = goals.get(goal_key, "healthy physique")
+    prompt = (
+        f"Transform the person in the reference photo to have {goal_desc}. "
+        "Maintain the person's face, skin tone, and head to preserve identity, but completely modify the body shape to match the target physique. "
+        "Keep the same standing pose, framing, lighting, and background. "
+        "Generate a photorealistic, high-quality, 8k image. Ensure the body looks natural and not cartoonish."
+    )
+    
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-image", # Using flash-exp which often supports generation in preview
+        contents=[
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part(
+                        inline_data=types.Blob(
+                            mime_type=mime_type,
+                            data=image_bytes,
+                        )
+                    ),
+                    types.Part(text=prompt),
+                ],
+            )
+        ],
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE"],
+        ),
+    )
+    return _extract_image_from_response(response)

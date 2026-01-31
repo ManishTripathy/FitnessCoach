@@ -1,0 +1,53 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import List
+import uuid
+
+from backend.core.deps import verify_firebase_token
+from backend.services.firebase_service import download_file_as_bytes, get_bucket
+from backend.services.ai_service import analyze_body_image, generate_future_physique
+
+router = APIRouter(prefix="/observe", tags=["observe"])
+
+class AnalyzeRequest(BaseModel):
+    storage_path: str
+
+class GenerateRequest(BaseModel):
+    storage_path: str
+    goal: str # lean, athletic, muscle
+
+@router.post("/analyze")
+async def analyze_body(request: AnalyzeRequest, token=Depends(verify_firebase_token)):
+    try:
+        # 1. Download image
+        image_bytes = download_file_as_bytes(request.storage_path)
+        
+        # 2. Analyze
+        analysis = analyze_body_image(image_bytes)
+        
+        return analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generate")
+async def generate_physique(request: GenerateRequest, token=Depends(verify_firebase_token)):
+    try:
+        # 1. Download source image
+        image_bytes = download_file_as_bytes(request.storage_path)
+        
+        # 2. Generate
+        generated_bytes = generate_future_physique(image_bytes, request.goal)
+        
+        # 3. Upload generated image
+        bucket = get_bucket()
+        user_id = token['uid']
+        filename = f"{uuid.uuid4()}.jpg"
+        save_path = f"users/{user_id}/observe/generated/{request.goal}_{filename}"
+        blob = bucket.blob(save_path)
+        blob.upload_from_string(generated_bytes, content_type="image/jpeg")
+        blob.make_public() # Or use signed URL
+        
+        return {"url": blob.public_url, "path": save_path}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

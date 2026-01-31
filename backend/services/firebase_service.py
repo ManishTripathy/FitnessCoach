@@ -56,6 +56,14 @@ def get_bucket():
         initialize_firebase()
     return _bucket
 
+def download_file_as_bytes(storage_path: str) -> bytes:
+    """Download a file from Firebase Storage as bytes."""
+    bucket = get_bucket()
+    if not bucket:
+        raise Exception("Storage bucket not initialized")
+    blob = bucket.blob(storage_path)
+    return blob.download_as_bytes()
+
 def check_firebase_connection():
     status = {
         "initialized": False,
