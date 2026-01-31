@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Observe from './pages/Observe';
+import Decide from './pages/Decide';
 import { useAuth } from './auth/AuthContext';
 
 const PrivateRoute = ({ children }) => {
@@ -24,6 +25,14 @@ function App() {
           element={
             <PrivateRoute>
               <Observe />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/decide" 
+          element={
+            <PrivateRoute>
+              <Decide />
             </PrivateRoute>
           } 
         />

@@ -157,7 +157,8 @@ const Observe = () => {
         if (!res.ok) throw new Error("Failed to save progress");
         
         setIsCompleted(true);
-        // In future, this would navigate to next feature
+        // Navigate to Decide phase
+        window.location.href = '/decide'; 
     } catch (e) {
         setError(e.message);
     } finally {

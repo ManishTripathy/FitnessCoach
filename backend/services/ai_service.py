@@ -102,7 +102,7 @@ def generate_future_physique(image_bytes: bytes, goal_key: str, mime_type: str =
     
     # Goal prompts map
     goals = {
-        "lean": "a Lean & Toned fitness model physique. Target 8-10% body fat. Visible six-pack abs, defined oblique muscles, tight waist. No excess fat. The look of a calisthenics athlete or boxer. Sharp definition.",
+        "lean": "a Lean & Toned physique. Target 8-10% body fat. Visible six-pack abs, defined oblique muscles, tight waist. No excess fat. The look of a calisthenics athlete or boxer. Sharp definition.",
         "athletic": "a Fit & Athletic physique. Broad shoulders, V-shaped torso, flat stomach with visible muscle tone. Well-developed chest and arms. The look of a competitive swimmer or decathlete. Healthy, capable, and strong, but not overly bulky.",
         "muscle": "a Muscular & Powerful physique. Significant natural muscle mass. Large chest, thick arms, and strong legs. Target 12-15% body fat (visible abs but not shredded). The look of a superhero actor or rugby player. Impressive size but realistic proportions."
     }
@@ -136,3 +136,83 @@ def generate_future_physique(image_bytes: bytes, goal_key: str, mime_type: str =
         ),
     )
     return _extract_image_from_response(response)
+
+def recommend_fitness_path(
+    original_image_bytes: bytes,
+    lean_image_bytes: bytes,
+    athletic_image_bytes: bytes,
+    muscle_image_bytes: bytes,
+    mime_type: str = "image/jpeg"
+) -> dict:
+    client = _get_client()
+    
+    prompt = """
+    You are an expert fitness coach helping a user choose a transformation path.
+    
+    I will provide 4 images:
+    1. The user's current physique (Original)
+    2. A potential 'Lean & Toned' future self (Lean)
+    3. A potential 'Athletic Build' future self (Athletic)
+    4. A potential 'Muscle Gain' future self (Muscle)
+    
+    Your task:
+    Analyze the gap between the current state and each goal. Provide a realistic assessment.
+    
+    Output structured JSON:
+    {
+      "lean": {
+         "time_estimate": "X-Y months",
+         "effort_level": "Moderate/High/Extreme",
+         "description": "Short explanation..."
+      },
+      "athletic": {
+         "time_estimate": "X-Y months",
+         "effort_level": "Moderate/High/Extreme",
+         "description": "Short explanation..."
+      },
+      "muscle": {
+         "time_estimate": "X-Y months",
+         "effort_level": "Moderate/High/Extreme",
+         "description": "Short explanation..."
+      },
+      "recommendation": {
+         "suggested_path": "lean" | "athletic" | "muscle",
+         "reasoning": "Why this is the best starting point..."
+      }
+    }
+    
+    Do NOT provide medical advice. Be realistic about natural transformation timelines.
+    """
+    
+    # Parts order matches the prompt description
+    parts = [
+        types.Part(text=prompt),
+        types.Part(text="Original Image:"),
+        types.Part(inline_data=types.Blob(mime_type=mime_type, data=original_image_bytes)),
+        types.Part(text="Lean Goal:"),
+        types.Part(inline_data=types.Blob(mime_type=mime_type, data=lean_image_bytes)),
+        types.Part(text="Athletic Goal:"),
+        types.Part(inline_data=types.Blob(mime_type=mime_type, data=athletic_image_bytes)),
+        types.Part(text="Muscle Goal:"),
+        types.Part(inline_data=types.Blob(mime_type=mime_type, data=muscle_image_bytes)),
+    ]
+    
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[types.Content(role="user", parts=parts)],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json"
+        )
+    )
+    
+    try:
+        return json.loads(response.text)
+    except Exception as e:
+        return {
+            "error": "Failed to parse AI response", 
+            "raw_text": response.text,
+            "recommendation": {
+                "suggested_path": "lean", 
+                "reasoning": "Default fallback due to parsing error."
+            }
+        }
