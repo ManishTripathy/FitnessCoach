@@ -4,7 +4,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Observe from './pages/Observe';
 import Decide from './pages/Decide';
+import Act from './pages/Act';
 import { useAuth } from './auth/AuthContext';
+
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -33,6 +35,14 @@ function App() {
           element={
             <PrivateRoute>
               <Decide />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/act" 
+          element={
+            <PrivateRoute>
+              <Act />
             </PrivateRoute>
           } 
         />

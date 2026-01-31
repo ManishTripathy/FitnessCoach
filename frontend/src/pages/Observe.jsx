@@ -4,8 +4,7 @@ import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Layout from '../components/Layout';
 import { useNavigate } from 'react-router-dom';
-
-const API_BASE = 'http://localhost:8000/api/v1';
+import { API_BASE } from '../config';
 
 const Observe = () => {
   const { currentUser } = useAuth();

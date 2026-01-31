@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-
-const API_BASE = 'http://localhost:8000/api/v1';
+import { API_BASE } from '../config';
 
 const Decide = () => {
   const { currentUser } = useAuth();
@@ -97,11 +96,13 @@ const Decide = () => {
       setCommitted(true);
       setSelectedPath(pathKey);
       alert("Path updated! You have completed the Decision phase.");
-      
+      // Navigate to Act phase
+      navigate('/act');
     } catch (err) {
       setError(err.message);
     }
   };
+
 
   if (loading) return <div className="p-8 text-center"><span className="loading loading-spinner loading-lg"></span></div>;
 
@@ -119,6 +120,9 @@ const Decide = () => {
                     <h3 className="font-bold">Path Selected: {selectedPath.toUpperCase()}</h3>
                     <div className="text-xs">You can still change your mind by selecting a different path below.</div>
                   </div>
+              </div>
+              <div className="flex-none">
+                 <button className="btn btn-sm" onClick={() => navigate('/act')}>Go to Plan</button>
               </div>
           </div>
       )}
@@ -194,6 +198,20 @@ const Decide = () => {
             );
         })}
       </div>
+
+      {committed && (
+        <div className="mt-12 flex justify-center">
+            <button 
+                className="btn btn-primary btn-lg gap-2 shadow-lg animate-bounce"
+                onClick={() => navigate('/act')}
+            >
+                Proceed to Act Phase 
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+            </button>
+        </div>
+      )}
     </div>
     </Layout>
   );
