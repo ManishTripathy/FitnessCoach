@@ -132,72 +132,133 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
 
           {/* Upload Section */}
           <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
-            {!uploadedImage ? (
-              <label className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-orange-500/50 rounded-2xl cursor-pointer hover:border-orange-500 transition-colors">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <div className="text-center space-y-4">
-                  <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto">
-                    <Upload className="w-10 h-10 text-orange-500" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-2xl font-semibold text-white font-sans">
-                      Upload Your Photo
-                    </p>
-                    <p className="text-white/60 font-sans">
-                      Click to browse or drag and drop
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-orange-400">
-                    <Camera className="w-5 h-5" />
-                    <span className="text-sm font-sans">Front-facing photo works best</span>
-                  </div>
-                </div>
-              </label>
-            ) : (
-              <div className="space-y-6">
-                <div className="relative rounded-2xl overflow-hidden bg-slate-900">
-                  <img
-                    src={uploadedImage}
-                    alt="Uploaded"
-                    className="w-full max-h-[500px] object-contain mx-auto"
-                  />
-                </div>
-
-                <div className="flex gap-4 justify-center">
-                  <label className="bg-slate-700 text-white px-6 py-3 rounded-full hover:bg-slate-600 transition-colors cursor-pointer font-sans">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              {/* Left Side: Upload Area */}
+              <div className="w-full">
+                {!uploadedImage ? (
+                  <label className="flex flex-col items-center justify-center aspect-[3/4] border-2 border-dashed border-orange-500/50 rounded-2xl cursor-pointer hover:border-orange-500 transition-colors group">
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload}
                       className="hidden"
                     />
-                    Change Photo
+                    <div className="text-center space-y-4 p-6">
+                      <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                        <Upload className="w-10 h-10 text-orange-500" />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-2xl font-semibold text-white font-sans">
+                          Upload Your Photo
+                        </p>
+                        <p className="text-white/60 font-sans">
+                          Click to browse or drag and drop
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-orange-400 justify-center">
+                        <Camera className="w-5 h-5" />
+                        <span className="text-sm font-sans">Front-facing photo works best</span>
+                      </div>
+                    </div>
                   </label>
-                  
-                  {!showAnalysis && (
-                    <button
-                      onClick={handleAnalyze}
-                      disabled={isAnalyzing}
-                      className="bg-orange-600 text-white px-8 py-3 rounded-full hover:bg-orange-700 disabled:bg-orange-600/50 transition-colors font-semibold font-sans flex items-center gap-2"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          Analyzing...
-                        </>
-                      ) : (
-                        'Analyze Photo'
+                ) : (
+                  <div className="space-y-6">
+                    <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[3/4] flex items-center justify-center border border-white/10">
+                      <img
+                        src={uploadedImage}
+                        alt="Uploaded"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    <div className="flex gap-4 justify-center">
+                      <label className="bg-slate-700 text-white px-6 py-3 rounded-full hover:bg-slate-600 transition-colors cursor-pointer font-sans text-sm">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                        Change Photo
+                      </label>
+                      
+                      {!showAnalysis && (
+                        <button
+                          onClick={handleAnalyze}
+                          disabled={isAnalyzing}
+                          className="bg-orange-600 text-white px-8 py-3 rounded-full hover:bg-orange-700 disabled:bg-orange-600/50 transition-colors font-semibold font-sans flex items-center gap-2 text-sm"
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                              Analyzing...
+                            </>
+                          ) : (
+                            'Analyze Photo'
+                          )}
+                        </button>
                       )}
-                    </button>
-                  )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Side: Information Write-up */}
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <h2 className="text-3xl font-bold text-white font-sans leading-tight">
+                    Instant Physique Analysis
+                  </h2>
+                  <p className="text-lg text-white/70 font-sans leading-relaxed">
+                    Our AI evaluates your current form to provide a comprehensive baseline for your transformation.
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex gap-4 items-start">
+                    <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold font-sans">Current Body Analysis</h3>
+                      <p className="text-white/60 text-sm font-sans mt-1">
+                        A detailed 1-liner assessment of your current physique and posture.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 items-start">
+                    <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold font-sans">Key Metrics</h3>
+                      <p className="text-white/60 text-sm font-sans mt-1">
+                        Get indicative Body Fat and Muscle Mass percentages calculated by our vision model.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 items-start">
+                    <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold font-sans">Transformation Path</h3>
+                      <p className="text-white/60 text-sm font-sans mt-1">
+                        Identify your body type and visualize your potential progress.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                  <p className="text-orange-400 text-sm italic font-sans">
+                    "The first step to a better you is knowing exactly where you stand today."
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Analysis Results */}
