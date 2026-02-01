@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PhotoUpload } from '../components/PhotoUpload';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
+  const [showUpload, setShowUpload] = useState(false);
+
+  if (showUpload) {
+    return <PhotoUpload onBack={() => setShowUpload(false)} />;
+  }
 
   const fitnessVideos = [
     {
@@ -107,7 +113,7 @@ const Landing: React.FC = () => {
             {/* Primary CTA */}
             <div>
               <button 
-                onClick={() => navigate('/register')}
+                onClick={() => setShowUpload(true)}
                 className="bg-orange-600 text-white text-xl px-12 py-5 rounded-full shadow-lg hover:bg-orange-700 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 font-semibold font-sans"
               >
                 Try now
