@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Observe from './pages/Observe';
 import Decide from './pages/Decide';
 import Act from './pages/Act';
+import Landing from './pages/Landing';
 import { useAuth } from './auth/AuthContext';
 
 
@@ -24,6 +25,7 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route 
@@ -50,7 +52,6 @@ function App() {
             </PrivateRoute>
           } 
         />
-        <Route path="/" element={<Navigate to="/observe" />} />
       </Routes>
     </Router>
   );

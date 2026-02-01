@@ -5,6 +5,11 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Layout from '../components/Layout';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { ArrowRight, Upload, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 
 interface AnalysisData {
     category: string;
@@ -189,97 +194,142 @@ const Observe: React.FC = () => {
 
   return (
     <Layout currentStep={0}>
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">Phase 1: Observe</h1>
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">Phase 1: Observe</h1>
+            <p className="text-muted-foreground">Upload a photo to let AI analyze your physique and project your potential.</p>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Upload Section */}
-            <div className="card bg-base-100 shadow-xl">
-                <div className="card-body">
-                    <h2 className="card-title">Upload Your Photo</h2>
-                    <p className="text-sm text-gray-500 mb-4">Upload a full-body photo for AI analysis.</p>
-                    
-                    <input 
-                        type="file" 
-                        className="file-input file-input-bordered file-input-primary w-full max-w-xs" 
-                        onChange={handleImageChange}
-                        accept="image/*"
-                    />
+            <Card>
+                <CardHeader>
+                    <CardTitle>Upload Your Photo</CardTitle>
+                    <CardDescription>Full-body photo works best for accurate analysis.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid w-full max-w-sm items-center gap-1.5">
+                        <Label htmlFor="picture">Picture</Label>
+                        <Input 
+                            id="picture" 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleImageChange}
+                        />
+                    </div>
                     
                     {preview && (
-                        <div className="mt-4 relative">
-                            <img src={preview} alt="Preview" className="rounded-lg shadow-md max-h-96 object-cover mx-auto" />
+                        <div className="mt-4 relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-muted">
+                            <img 
+                                src={preview} 
+                                alt="Preview" 
+                                className="h-full w-full object-cover" 
+                            />
                         </div>
                     )}
-                    
-                    <div className="card-actions justify-end mt-4">
-                        <button 
-                            className={`btn btn-primary ${loading ? 'loading' : ''}`}
-                            onClick={handleUploadAndAnalyze}
-                            disabled={!image || loading || genLoading}
-                        >
-                            {loading ? 'Analyzing...' : 'Analyze & Visualize'}
-                        </button>
-                    </div>
-                    {error && <p className="text-error mt-2 text-sm">{error}</p>}
-                </div>
-            </div>
+                </CardContent>
+                <CardFooter className="flex flex-col gap-2">
+                    {error && (
+                        <div className="flex items-center gap-2 text-destructive text-sm w-full p-2 bg-destructive/10 rounded">
+                            <AlertCircle className="w-4 h-4" />
+                            {error}
+                        </div>
+                    )}
+                    <Button 
+                        className="w-full" 
+                        onClick={handleUploadAndAnalyze}
+                        disabled={!image || loading || genLoading}
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Analyzing...
+                            </>
+                        ) : (
+                            <>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Analyze & Visualize
+                            </>
+                        )}
+                    </Button>
+                </CardFooter>
+            </Card>
 
             {/* Results Section */}
             <div className="flex flex-col gap-6">
                 {/* Analysis Result */}
                 {analysis && (
-                    <div className="card bg-base-100 shadow-xl animate-fade-in">
-                        <div className="card-body">
-                            <h2 className="card-title text-secondary">AI Analysis</h2>
-                            <div className="divider my-0"></div>
-                            <div className="prose">
-                                <p><strong>Body Category:</strong> {analysis.category}</p>
-                                <p><strong>Analysis:</strong> {analysis.reasoning}</p>
+                    <Card className="animate-fade-in border-primary/20">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-primary">
+                                <Sparkles className="w-5 h-5" />
+                                AI Analysis
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <h4 className="font-semibold text-sm text-muted-foreground">Body Category</h4>
+                                <p className="text-lg font-medium">{analysis.category}</p>
                             </div>
-                        </div>
-                    </div>
+                            <div>
+                                <h4 className="font-semibold text-sm text-muted-foreground">Detailed Assessment</h4>
+                                <p className="leading-relaxed">{analysis.reasoning}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Generated Futures */}
                 {genLoading && (
-                    <div className="alert alert-info shadow-lg">
-                        <div>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current flex-shrink-0 w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            <span>Generating your potential future selves... (This takes ~10-20s)</span>
-                        </div>
-                    </div>
+                     <Card className="animate-pulse bg-muted/50 border-none">
+                        <CardContent className="flex flex-col items-center justify-center p-8 text-center space-y-4">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-muted-foreground">Generating your potential future selves...<br/>This takes about 10-20 seconds.</p>
+                        </CardContent>
+                     </Card>
                 )}
 
                 {futureImages.length > 0 && (
-                    <div className="card bg-base-100 shadow-xl animate-fade-in">
-                        <div className="card-body">
-                            <h2 className="card-title text-accent">Potential Futures</h2>
-                            <div className="carousel rounded-box w-full space-x-4 p-4 bg-neutral-focus">
+                    <Card className="animate-fade-in">
+                        <CardHeader>
+                            <CardTitle>Potential Futures</CardTitle>
+                            <CardDescription>AI-generated visualizations of your goal physiques.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 {futureImages.map((img, idx) => (
-                                    <div key={idx} className="carousel-item flex flex-col items-center">
-                                        <img src={img.url} alt={img.goal} className="rounded-box h-64 object-cover" />
-                                        <span className="badge badge-outline mt-2">{img.goal}</span>
+                                    <div key={idx} className="group relative overflow-hidden rounded-md border bg-muted aspect-[3/4]">
+                                        <img 
+                                            src={img.url} 
+                                            alt={img.goal} 
+                                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+                                            <span className="text-white text-xs font-medium uppercase tracking-wider bg-black/50 px-2 py-1 rounded backdrop-blur-sm">
+                                                {img.goal}
+                                            </span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
         </div>
 
         {/* Navigation */}
         {(analysis || isCompleted) && (
-            <div className="mt-8 flex justify-center">
-                <button 
-                    className="btn btn-secondary btn-lg btn-wide gap-2"
+            <div className="flex justify-center pt-8 pb-12">
+                <Button 
+                    size="lg" 
                     onClick={handleProceed}
                     disabled={saving || genLoading}
+                    className="w-full sm:w-auto px-8 gap-2 text-lg h-12"
                 >
-                    Proceed to Phase 2: Decide
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                </button>
+                    {saving ? 'Saving...' : 'Proceed to Phase 2: Decide'}
+                    {!saving && <ArrowRight className="w-5 h-5" />}
+                </Button>
             </div>
         )}
       </div>

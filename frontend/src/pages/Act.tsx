@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import Layout from '../components/Layout';
 import { API_BASE } from '../config';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Loader2, Play, ExternalLink, RefreshCw, Calendar, CheckCircle2, AlertCircle } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface WorkoutDetails {
     title?: string;
@@ -94,83 +98,126 @@ const Act: React.FC = () => {
     const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : null;
 
     return (
-      <div key={day.day} className={`card bg-base-100 shadow-xl ${isRest ? 'opacity-80' : ''}`}>
+      <Card key={day.day} className={cn("overflow-hidden flex flex-col h-full", isRest && "opacity-80 bg-muted/50")}>
         {!isRest && thumbnailUrl && (
-          <figure className="relative">
-            <img src={thumbnailUrl} alt={workout.title} className="w-full h-48 object-cover" />
-            <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+          <div className="relative aspect-video w-full overflow-hidden bg-black group">
+            <img 
+                src={thumbnailUrl} 
+                alt={workout.title} 
+                className="w-full h-full object-cover transition-opacity group-hover:opacity-75" 
+            />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <a 
                     href={workout.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="btn btn-circle btn-lg btn-error text-white"
+                    className="flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-110 transition-transform"
                 >
-                    ▶
+                    <Play className="h-6 w-6 fill-current" />
                 </a>
             </div>
-          </figure>
+          </div>
         )}
-        <div className="card-body p-5">
+        <CardHeader className="p-4 pb-2">
           <div className="flex justify-between items-start">
-            <h3 className="card-title text-lg">{day.day_name}</h3>
+            <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                {day.day_name}
+            </CardTitle>
             {isRest ? (
-                <span className="badge badge-ghost">Rest Day</span>
+                <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                    Rest Day
+                </div>
             ) : (
-                <span className="badge badge-primary">Workout</span>
+                <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
+                    Workout
+                </div>
             )}
           </div>
-          
-          {isRest ? (
-            <div className="py-4 text-center text-gray-500 italic">
-                Active recovery: Light walking or stretching recommended.
-            </div>
-          ) : (
-            <>
-                <h4 className="font-bold mt-2">{workout.title || "Workout Session"}</h4>
-                <p className="text-sm text-gray-600 line-clamp-3">{workout.description}</p>
-                <div className="card-actions justify-end mt-4">
-                    <a href={workout.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline">
-                        Watch Video
-                    </a>
+        </CardHeader>
+        
+        <CardContent className="p-4 pt-2 flex-grow">
+            {isRest ? (
+                <div className="py-4 text-center text-muted-foreground italic text-sm">
+                    Active recovery: Light walking or stretching recommended.
                 </div>
-            </>
-          )}
-        </div>
-      </div>
+            ) : (
+                <>
+                    <h4 className="font-semibold leading-none tracking-tight mb-2 line-clamp-1">{workout.title || "Workout Session"}</h4>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{workout.description}</p>
+                </>
+            )}
+        </CardContent>
+
+        {!isRest && (
+            <CardFooter className="p-4 pt-0">
+                <Button variant="outline" size="sm" className="w-full gap-2" asChild>
+                    <a href={workout.url} target="_blank" rel="noopener noreferrer">
+                        Watch Video
+                        <ExternalLink className="h-3 w-3" />
+                    </a>
+                </Button>
+            </CardFooter>
+        )}
+      </Card>
     );
   };
 
-  if (loading) return <div className="flex justify-center p-10"><span className="loading loading-spinner loading-lg"></span></div>;
+  if (loading) {
+      return (
+          <Layout currentStep={2}>
+              <div className="flex items-center justify-center min-h-[50vh]">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+          </Layout>
+      );
+  }
 
   return (
     <Layout currentStep={2}>
-      <div className="container mx-auto">
-        <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">Your Weekly Plan</h1>
-            <button 
-                className={`btn btn-sm btn-ghost ${generating ? 'loading' : ''}`}
+      <div className="container mx-auto space-y-8 pb-12">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Your Weekly Plan</h1>
+                <p className="text-muted-foreground">A personalized schedule to help you achieve your goals.</p>
+            </div>
+            <Button 
+                variant="ghost" 
+                size="sm"
+                className="gap-2"
                 onClick={() => generatePlan(true)}
                 disabled={generating}
             >
+                {generating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                    <RefreshCw className="h-4 w-4" />
+                )}
                 Regenerate Plan
-            </button>
+            </Button>
         </div>
 
-        {error && <div className="alert alert-error mb-4">{error}</div>}
-
-        {generating && (
-            <div className="alert alert-info mb-6">
-                <span>Creating your personalized schedule based on your goal...</span>
+        {error && (
+            <div className="flex items-center gap-2 text-destructive text-sm w-full p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                <AlertCircle className="w-4 h-4" />
+                {error}
             </div>
         )}
 
-        {plan && (
-            <div className="space-y-6">
-                <div className="alert alert-success shadow-lg">
-                    <div>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <span>Current Goal: <strong>{plan.goal}</strong></span>
-                    </div>
+        {generating && (
+            <div className="flex items-center justify-center p-12 border rounded-lg bg-muted/20">
+                <div className="text-center space-y-4">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    <p className="text-muted-foreground">Creating your personalized schedule based on your goal...</p>
+                </div>
+            </div>
+        )}
+
+        {plan && !generating && (
+            <div className="space-y-6 animate-fade-in">
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span>Current Goal: <strong>{plan.goal}</strong></span>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

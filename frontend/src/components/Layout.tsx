@@ -2,6 +2,7 @@ import React, { ReactNode } from 'react';
 import PhaseStepper from './PhaseStepper';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Button } from './ui/button';
 
 interface LayoutProps {
   children: ReactNode;
@@ -22,22 +23,26 @@ const Layout: React.FC<LayoutProps> = ({ children, currentStep }) => {
   };
 
   return (
-    <div className="min-h-screen bg-base-200 flex flex-col">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Navbar */}
-      <div className="navbar bg-base-100 shadow-md px-4">
-        <div className="flex-1">
-          <a className="btn btn-ghost normal-case text-xl text-primary font-bold">Fitness Coach AI</a>
+      <header className="relative w-full bg-background/50 backdrop-blur-md border-b border-border z-10">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="text-xl font-bold">
+            <span className="text-primary">Fitness</span> Coach AI
+          </div>
+          <div className="flex items-center gap-6">
+             <Button variant="ghost" onClick={handleLogout}>Logout</Button>
+          </div>
         </div>
-        <div className="flex-none">
-          <button className="btn btn-ghost" onClick={handleLogout}>Logout</button>
-        </div>
-      </div>
+      </header>
 
       {/* Stepper */}
-      <PhaseStepper currentStep={currentStep} />
+      <div className="w-full bg-muted/20 border-b border-border">
+          <PhaseStepper currentStep={currentStep} />
+      </div>
 
       {/* Main Content */}
-      <main className="flex-grow container mx-auto p-4 animate-fade-in">
+      <main className="flex-grow container mx-auto p-6 animate-fade-in">
         {children}
       </main>
     </div>
