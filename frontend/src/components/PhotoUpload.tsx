@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { anonymousApi, observeApi } from '../services/api';
 import { AuthModal } from './AuthModal';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -17,65 +18,67 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Load session from local storage if exists
     const storedSession = localStorage.getItem('anonymous_session_id');
-    if (storedSession) {
-      setSessionId(storedSession);
+    const auth = getAuth();
+    
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setIsLoggedIn(!!user);
       
-      // Fetch existing results to restore state
-      setIsUploading(true);
+      if (storedSession) {
+        setSessionId(storedSession);
+        setIsUploading(true);
 
-      const fetchAnonymous = (sid: string) => {
-        anonymousApi.getResults(sid)
-            .then(data => {
-            if (data.uploaded_photo_url) {
-                setUploadedImage(data.uploaded_photo_url);
-            }
-            if (data.analysis_results) {
-                setAnalysisResults(data.analysis_results);
-                setShowAnalysis(true);
-            }
-            })
-            .catch(err => {
-            console.error("Failed to restore session", err);
-            if (err.response && err.response.status === 404) {
-                localStorage.removeItem('anonymous_session_id');
-            }
-            })
-            .finally(() => {
-            setIsUploading(false);
-            });
-      };
-
-      const auth = getAuth();
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (user) {
-              // User is logged in, try fetching from user's scans first
-              try {
-                  const data = await observeApi.getScan(storedSession);
-                  if (data.uploaded_photo_url) {
-                    setUploadedImage(data.uploaded_photo_url);
-                  }
-                  if (data.analysis_results) {
-                    setAnalysisResults(data.analysis_results);
-                    setShowAnalysis(true);
-                  }
-                  setIsUploading(false);
-              } catch (err) {
-                  console.error("Failed to fetch from user scans, trying anonymous", err);
-                  fetchAnonymous(storedSession);
+        const fetchAnonymous = (sid: string) => {
+          anonymousApi.getResults(sid)
+              .then(data => {
+              if (data.uploaded_photo_url) {
+                  setUploadedImage(data.uploaded_photo_url);
               }
-          } else {
-              // Not logged in, fetch from anonymous
-              fetchAnonymous(storedSession);
-          }
-      });
-      
-      return () => unsubscribe();
-    }
+              if (data.analysis_results) {
+                  setAnalysisResults(data.analysis_results);
+                  setShowAnalysis(true);
+              }
+              })
+              .catch(err => {
+              console.error("Failed to restore session", err);
+              if (err.response && err.response.status === 404) {
+                  localStorage.removeItem('anonymous_session_id');
+              }
+              })
+              .finally(() => {
+              setIsUploading(false);
+              });
+        };
+
+        if (user) {
+            // User is logged in, try fetching from user's scans first
+            try {
+                const data = await observeApi.getScan(storedSession);
+                if (data.uploaded_photo_url) {
+                  setUploadedImage(data.uploaded_photo_url);
+                }
+                if (data.analysis_results) {
+                  setAnalysisResults(data.analysis_results);
+                  setShowAnalysis(true);
+                }
+                setIsUploading(false);
+            } catch (err) {
+                console.error("Failed to fetch from user scans, trying anonymous", err);
+                fetchAnonymous(storedSession);
+            }
+        } else {
+            // Not logged in, fetch from anonymous
+            fetchAnonymous(storedSession);
+        }
+      }
+    });
+    
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -124,6 +127,21 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
       const results = await anonymousApi.analyzePhoto(sessionId);
       setAnalysisResults(results);
       setShowAnalysis(true);
+
+      // If user is logged in, automatically migrate the new analysis to their profile
+      const auth = getAuth();
+      if (auth.currentUser) {
+          try {
+              const token = await auth.currentUser.getIdToken();
+              await anonymousApi.migrateData(sessionId, token);
+              // Note: Session is deleted from anonymous store, but we keep the ID 
+              // because observeApi.getScan can now retrieve it from user profile
+          } catch (migrateErr) {
+              console.error("Auto-migration failed", migrateErr);
+              // Don't fail the analysis display, just log it
+          }
+      }
+
     } catch (err: any) {
       console.error("Analysis failed", err);
       if (err.response?.status === 404) {
@@ -390,12 +408,14 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
                     <h2 className="text-3xl font-bold text-white font-sans">
                     Current Body Analysis
                     </h2>
-                    <button 
-                        onClick={() => setIsAuthModalOpen(true)}
-                        className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full font-semibold transition-colors"
-                    >
-                        Save Analysis & Continue
-                    </button>
+                    {!isLoggedIn && (
+                        <button 
+                            onClick={() => setIsAuthModalOpen(true)}
+                            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full font-semibold transition-colors"
+                        >
+                            Save Analysis & Continue
+                        </button>
+                    )}
                 </div>
                 
                 <p className="text-white/80 mb-6 font-sans text-lg italic">
