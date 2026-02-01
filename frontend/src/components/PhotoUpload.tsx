@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, ArrowLeft } from 'lucide-react';
+import { anonymousApi, observeApi } from '../services/api';
+import { AuthModal } from './AuthModal';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 interface PhotoUploadProps {
   onBack: () => void;
@@ -9,7 +12,71 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load session from local storage if exists
+    const storedSession = localStorage.getItem('anonymous_session_id');
+    if (storedSession) {
+      setSessionId(storedSession);
+      
+      // Fetch existing results to restore state
+      setIsUploading(true);
+
+      const fetchAnonymous = (sid: string) => {
+        anonymousApi.getResults(sid)
+            .then(data => {
+            if (data.uploaded_photo_url) {
+                setUploadedImage(data.uploaded_photo_url);
+            }
+            if (data.analysis_results) {
+                setAnalysisResults(data.analysis_results);
+                setShowAnalysis(true);
+            }
+            })
+            .catch(err => {
+            console.error("Failed to restore session", err);
+            if (err.response && err.response.status === 404) {
+                localStorage.removeItem('anonymous_session_id');
+            }
+            })
+            .finally(() => {
+            setIsUploading(false);
+            });
+      };
+
+      const auth = getAuth();
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+              // User is logged in, try fetching from user's scans first
+              try {
+                  const data = await observeApi.getScan(storedSession);
+                  if (data.uploaded_photo_url) {
+                    setUploadedImage(data.uploaded_photo_url);
+                  }
+                  if (data.analysis_results) {
+                    setAnalysisResults(data.analysis_results);
+                    setShowAnalysis(true);
+                  }
+                  setIsUploading(false);
+              } catch (err) {
+                  console.error("Failed to fetch from user scans, trying anonymous", err);
+                  fetchAnonymous(storedSession);
+              }
+          } else {
+              // Not logged in, fetch from anonymous
+              fetchAnonymous(storedSession);
+          }
+      });
+      
+      return () => unsubscribe();
+    }
+  }, []);
 
   useEffect(() => {
     if (showAnalysis && resultsRef.current) {
@@ -17,25 +84,59 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     }
   }, [showAnalysis]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    setError(null);
     if (file) {
+      setIsUploading(true);
+      // Show preview immediately
       const reader = new FileReader();
       reader.onloadend = () => {
         setUploadedImage(reader.result as string);
         setShowAnalysis(false);
       };
       reader.readAsDataURL(file);
+
+      // Upload in background
+      try {
+        const response = await anonymousApi.uploadPhoto(file, sessionId);
+        setSessionId(response.session_id);
+        localStorage.setItem('anonymous_session_id', response.session_id);
+      } catch (err) {
+        console.error("Upload failed", err);
+        setError("Failed to upload photo. Please try again.");
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
+    if (!sessionId) {
+      console.error("No session ID found");
+      setError("Session invalid. Please upload photo again.");
+      return;
+    }
+
     setIsAnalyzing(true);
-    // Simulate AI analysis
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    setError(null);
+    try {
+      const results = await anonymousApi.analyzePhoto(sessionId);
+      setAnalysisResults(results);
       setShowAnalysis(true);
-    }, 2000);
+    } catch (err: any) {
+      console.error("Analysis failed", err);
+      if (err.response?.status === 404) {
+        setError("Session expired. Please upload your photo again.");
+        localStorage.removeItem('anonymous_session_id');
+        setSessionId(null);
+        setUploadedImage(null);
+      } else {
+        setError("Analysis failed. Please try again.");
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const fitnessVideos = [
@@ -137,6 +238,13 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
             </p>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-6 py-4 rounded-xl max-w-2xl mx-auto text-center backdrop-blur-md">
+              <p>{error}</p>
+            </div>
+          )}
+
           {/* Upload Section */}
           <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -192,13 +300,18 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
                       {!showAnalysis && (
                         <button
                           onClick={handleAnalyze}
-                          disabled={isAnalyzing}
+                          disabled={isAnalyzing || isUploading}
                           className="bg-orange-600 text-white px-8 py-3 rounded-full hover:bg-orange-700 disabled:bg-orange-600/50 transition-colors font-semibold font-sans flex items-center gap-2 text-sm"
                         >
                           {isAnalyzing ? (
                             <>
                               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                               Analyzing...
+                            </>
+                          ) : isUploading ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                              Uploading...
                             </>
                           ) : (
                             'Analyze Photo'
@@ -273,24 +386,37 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
             <div ref={resultsRef} className="space-y-8 animate-fadeIn">
               {/* Current Analysis */}
               <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
-                <h2 className="text-3xl font-bold text-white mb-6 font-sans">
-                  Current Body Analysis
-                </h2>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-3xl font-bold text-white font-sans">
+                    Current Body Analysis
+                    </h2>
+                    <button 
+                        onClick={() => setIsAuthModalOpen(true)}
+                        className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full font-semibold transition-colors"
+                    >
+                        Save Analysis & Continue
+                    </button>
+                </div>
+                
+                <p className="text-white/80 mb-6 font-sans text-lg italic">
+                    "{analysisResults?.reasoning || 'Analyzing...'}"
+                </p>
+
                 <div className="grid md:grid-cols-3 gap-6">
                   <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
-                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">BMI</div>
-                    <div className="text-4xl font-black text-white font-sans">24.8</div>
-                    <div className="text-white/60 text-sm mt-1 font-sans">Normal range</div>
+                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Category</div>
+                    <div className="text-4xl font-black text-white font-sans">{analysisResults?.category || 'N/A'}</div>
+                    <div className="text-white/60 text-sm mt-1 font-sans">{analysisResults?.body_type_description || 'Analysis'}</div>
                   </div>
                   <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
-                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Body Fat</div>
-                    <div className="text-4xl font-black text-white font-sans">18%</div>
-                    <div className="text-white/60 text-sm mt-1 font-sans">Athletic</div>
+                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Body Fat (Est.)</div>
+                    <div className="text-4xl font-black text-white font-sans">{analysisResults?.estimated_body_fat || '18'}%</div>
+                    <div className="text-white/60 text-sm mt-1 font-sans">Approximate</div>
                   </div>
                   <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
-                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Muscle Mass</div>
-                    <div className="text-4xl font-black text-white font-sans">42%</div>
-                    <div className="text-white/60 text-sm mt-1 font-sans">Above average</div>
+                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Muscle Mass (Est.)</div>
+                    <div className="text-4xl font-black text-white font-sans">{analysisResults?.estimated_muscle_mass || '42'}%</div>
+                    <div className="text-white/60 text-sm mt-1 font-sans">Approximate</div>
                   </div>
                 </div>
               </div>
@@ -329,6 +455,13 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
           )}
         </div>
       </main>
+      
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)}
+        sessionId={sessionId || ''}
+      />
 
       <style>{`
         @keyframes scroll {

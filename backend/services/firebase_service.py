@@ -64,6 +64,36 @@ def download_file_as_bytes(storage_path: str) -> bytes:
     blob = bucket.blob(storage_path)
     return blob.download_as_bytes()
 
+def save_anonymous_session(session_id: str, data: dict):
+    """Save anonymous session data to Firestore."""
+    db = get_db()
+    if not db:
+        raise Exception("Firestore not initialized")
+    
+    # Merge with existing data if any
+    doc_ref = db.collection('anonymous_sessions').document(session_id)
+    doc_ref.set(data, merge=True)
+
+def get_anonymous_session(session_id: str) -> dict:
+    """Get anonymous session data from Firestore."""
+    db = get_db()
+    if not db:
+        raise Exception("Firestore not initialized")
+    
+    doc_ref = db.collection('anonymous_sessions').document(session_id)
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+def delete_anonymous_session(session_id: str):
+    """Delete anonymous session data from Firestore."""
+    db = get_db()
+    if not db:
+        raise Exception("Firestore not initialized")
+    
+    db.collection('anonymous_sessions').document(session_id).delete()
+
 def check_firebase_connection():
     status = {
         "initialized": False,

@@ -4,7 +4,7 @@ from typing import List
 import uuid
 
 from backend.core.deps import verify_firebase_token
-from backend.services.firebase_service import download_file_as_bytes, get_bucket
+from backend.services.firebase_service import download_file_as_bytes, get_bucket, get_db
 from backend.services.ai_service import analyze_body_image, generate_future_physique
 
 router = APIRouter(prefix="/observe", tags=["observe"])
@@ -28,6 +28,21 @@ async def analyze_body(request: AnalyzeRequest, token=Depends(verify_firebase_to
         return analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/scans/{scan_id}")
+async def get_scan(scan_id: str, token=Depends(verify_firebase_token)):
+    user_id = token['uid']
+    db = get_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not initialized")
+        
+    doc_ref = db.collection('users').document(user_id).collection('scans').document(scan_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Scan not found")
+        
+    return doc.to_dict()
 
 @router.post("/generate")
 async def generate_physique(request: GenerateRequest, token=Depends(verify_firebase_token)):

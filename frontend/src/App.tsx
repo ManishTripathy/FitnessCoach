@@ -21,11 +21,14 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   return currentUser ? <>{children}</> : <Navigate to="/login" />;
 };
 
+import { PhotoUpload } from './components/PhotoUpload';
+
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/analyze" element={<PhotoUpload onBack={() => window.location.href = '/'} />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route 

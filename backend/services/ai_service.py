@@ -46,14 +46,20 @@ def analyze_body_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dic
     client = _get_client()
     
     prompt = """
-    You are an expert fitness coach. Analyze this body photo to estimate a high-level body category.
+    You are an expert fitness coach. Analyze this body photo to estimate a high-level body category and key metrics.
     Category Definitions:
     - Lean: Clearly visible muscle definition, low body fat.
     - Average: Moderate body fat, some muscle definition, healthy appearance.
     - Overfat: Higher body fat percentage, limited muscle visibility.
     
-    Output JSON with 'category' (Lean|Average|Overfat) and 'reasoning'.
-    Do NOT provide medical advice.
+    Output JSON with:
+    - 'category' (Lean|Average|Overfat)
+    - 'reasoning' (1-liner assessment of current physique and posture)
+    - 'estimated_body_fat' (numeric percentage, e.g., 18)
+    - 'estimated_muscle_mass' (numeric percentage, e.g., 42)
+    - 'body_type_description' (e.g., 'Athletic', 'Soft', 'Muscular')
+    
+    Do NOT provide medical advice. These are visual estimates only.
     """
     
     response = client.models.generate_content(
