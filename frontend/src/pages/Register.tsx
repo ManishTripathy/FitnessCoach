@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import React, { useState, FormEvent } from 'react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
-const Login = () => {
+const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await createUserWithEmailAndPassword(auth, email, password);
       navigate('/observe');
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message);
     }
   };
@@ -23,11 +23,11 @@ const Login = () => {
     <div className="hero min-h-screen bg-base-200">
       <div className="hero-content flex-col lg:flex-row-reverse">
         <div className="text-center lg:text-left">
-          <h1 className="text-5xl font-bold">Login now!</h1>
-          <p className="py-6">Join the AI Fitness Coach to transform your body.</p>
+          <h1 className="text-5xl font-bold">Sign Up!</h1>
+          <p className="py-6">Create an account to start your fitness journey with AI.</p>
         </div>
         <div className="card shrink-0 w-full max-w-sm shadow-2xl bg-base-100">
-          <form className="card-body" onSubmit={handleLogin}>
+          <form className="card-body" onSubmit={handleRegister}>
             <div className="form-control">
               <label className="label">
                 <span className="label-text">Email</span>
@@ -53,15 +53,14 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <label className="label">
-                <a href="#" className="label-text-alt link link-hover">Forgot password?</a>
-                <a href="/register" className="label-text-alt link link-hover">Create account</a>
-              </label>
             </div>
             {error && <p className="text-error text-sm">{error}</p>}
             <div className="form-control mt-6">
-              <button className="btn btn-primary">Login</button>
+              <button className="btn btn-primary">Register</button>
             </div>
+            <label className="label">
+              <Link to="/login" className="label-text-alt link link-hover">Already have an account? Login</Link>
+            </label>
           </form>
         </div>
       </div>
@@ -69,4 +68,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Register;

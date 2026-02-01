@@ -177,7 +177,8 @@ def recommend_fitness_path(
       },
       "recommendation": {
          "suggested_path": "lean" | "athletic" | "muscle",
-         "reasoning": "Why this is the best starting point..."
+         "reasoning": "Why this is the best starting point...",
+         "confidence_score": 0.0 to 1.0
       }
     }
     

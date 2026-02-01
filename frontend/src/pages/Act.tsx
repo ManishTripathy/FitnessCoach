@@ -1,15 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import Layout from '../components/Layout';
 import { API_BASE } from '../config';
 
-const Act = () => {
+interface WorkoutDetails {
+    title?: string;
+    url?: string;
+    description?: string;
+}
+
+interface PlanDay {
+    day: number;
+    day_name: string;
+    is_rest: boolean;
+    workout_id?: string;
+    workout_details?: WorkoutDetails;
+}
+
+interface WeeklyPlan {
+    goal: string;
+    schedule: PlanDay[];
+}
+
+const Act: React.FC = () => {
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [plan, setPlan] = useState(null);
+  const [plan, setPlan] = useState<WeeklyPlan | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -41,6 +58,7 @@ const Act = () => {
   };
 
   const generatePlan = async (force = false) => {
+    if (!currentUser) return;
     setGenerating(true);
     setError('');
     try {
@@ -58,7 +76,7 @@ const Act = () => {
       
       const data = await response.json();
       setPlan(data.plan);
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message);
     } finally {
       setGenerating(false);
@@ -66,7 +84,7 @@ const Act = () => {
     }
   };
 
-  const renderDayCard = (day) => {
+  const renderDayCard = (day: PlanDay) => {
     const isRest = day.is_rest || !day.workout_id;
     const workout = day.workout_details || {};
     
@@ -98,85 +116,68 @@ const Act = () => {
             {isRest ? (
                 <span className="badge badge-ghost">Rest Day</span>
             ) : (
-                <span className="badge badge-secondary">{workout.duration_mins} min</span>
+                <span className="badge badge-primary">Workout</span>
             )}
           </div>
           
           {isRest ? (
-            <div className="mt-2">
-                <p className="italic text-gray-500">{day.notes || "Rest and recover."}</p>
+            <div className="py-4 text-center text-gray-500 italic">
+                Active recovery: Light walking or stretching recommended.
             </div>
           ) : (
-            <div className="mt-2 space-y-2">
-                <p className="font-semibold text-primary">{workout.title}</p>
-                <p className="text-sm text-gray-600">{day.notes}</p>
-                <div className="flex flex-wrap gap-1 mt-2">
-                    {workout.focus && workout.focus.map((tag, idx) => (
-                        <span key={idx} className="badge badge-xs badge-outline">{tag}</span>
-                    ))}
+            <>
+                <h4 className="font-bold mt-2">{workout.title || "Workout Session"}</h4>
+                <p className="text-sm text-gray-600 line-clamp-3">{workout.description}</p>
+                <div className="card-actions justify-end mt-4">
+                    <a href={workout.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline">
+                        Watch Video
+                    </a>
                 </div>
-            </div>
-          )}
-          
-          {!isRest && (
-             <div className="card-actions justify-end mt-4">
-                 <a href={workout.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-primary w-full">
-                     Start Workout
-                 </a>
-             </div>
+            </>
           )}
         </div>
       </div>
     );
   };
 
-  if (loading || generating) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-          <span className="loading loading-spinner loading-lg text-primary"></span>
-          <h2 className="text-2xl font-bold animate-pulse">Building your perfect week...</h2>
-          <p className="text-gray-500 max-w-md text-center">
-            Our AI is analyzing your goal and selecting the best Caroline Girvan workouts for you.
-          </p>
-        </div>
-      </Layout>
-    );
-  }
+  if (loading) return <div className="flex justify-center p-10"><span className="loading loading-spinner loading-lg"></span></div>;
 
   return (
-    <Layout>
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <div>
-                <h1 className="text-4xl font-bold mb-2">Your Weekly Plan</h1>
-                <p className="text-gray-600">
-                    Focus: <span className="font-semibold text-secondary">{plan?.weekly_focus || "General Fitness"}</span>
-                </p>
-            </div>
+    <Layout currentStep={2}>
+      <div className="container mx-auto">
+        <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold">Your Weekly Plan</h1>
             <button 
-                onClick={() => generatePlan(true)} 
-                className="btn btn-outline btn-sm"
+                className={`btn btn-sm btn-ghost ${generating ? 'loading' : ''}`}
+                onClick={() => generatePlan(true)}
                 disabled={generating}
             >
-                ↻ Regenerate Plan
+                Regenerate Plan
             </button>
         </div>
 
-        {error && (
-            <div className="alert alert-error mb-6">
-                <span>{error}</span>
+        {error && <div className="alert alert-error mb-4">{error}</div>}
+
+        {generating && (
+            <div className="alert alert-info mb-6">
+                <span>Creating your personalized schedule based on your goal...</span>
             </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {plan?.schedule?.map(renderDayCard)}
-        </div>
-        
-        <div className="mt-12 p-6 bg-base-200 rounded-xl text-center">
-            <h3 className="text-xl font-bold mb-2">Ready for next week?</h3>
-            <p className="mb-4 text-gray-600">Complete this week's workouts to unlock new challenges.</p>
-        </div>
+        {plan && (
+            <div className="space-y-6">
+                <div className="alert alert-success shadow-lg">
+                    <div>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span>Current Goal: <strong>{plan.goal}</strong></span>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {plan.schedule.map(day => renderDayCard(day))}
+                </div>
+            </div>
+        )}
       </div>
     </Layout>
   );

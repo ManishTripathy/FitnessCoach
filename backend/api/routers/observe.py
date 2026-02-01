@@ -32,11 +32,14 @@ async def analyze_body(request: AnalyzeRequest, token=Depends(verify_firebase_to
 @router.post("/generate")
 async def generate_physique(request: GenerateRequest, token=Depends(verify_firebase_token)):
     try:
+        print(f"Generating physique for goal: {request.goal}")
         # 1. Download source image
         image_bytes = download_file_as_bytes(request.storage_path)
+        print("Image downloaded successfully")
         
         # 2. Generate
         generated_bytes = generate_future_physique(image_bytes, request.goal)
+        print("Image generated successfully")
         
         # 3. Upload generated image
         bucket = get_bucket()
@@ -50,4 +53,13 @@ async def generate_physique(request: GenerateRequest, token=Depends(verify_fireb
         return {"url": blob.public_url, "path": save_path}
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error in generate_physique: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    except BaseException as e:
+        import traceback
+        traceback.print_exc()
+        print(f"CRITICAL ERROR in generate_physique: {e}")
+        # Prevent server shutdown if possible by raising standard HTTP exception
+        raise HTTPException(status_code=500, detail="Critical Server Error")

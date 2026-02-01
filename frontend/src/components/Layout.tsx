@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import PhaseStepper from './PhaseStepper';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-const Layout = ({ children, currentStep }) => {
+interface LayoutProps {
+  children: ReactNode;
+  currentStep: number;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children, currentStep }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
