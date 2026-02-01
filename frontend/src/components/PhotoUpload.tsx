@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, ArrowLeft } from 'lucide-react';
 
 interface PhotoUploadProps {
@@ -9,6 +9,13 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showAnalysis && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [showAnalysis]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -263,7 +270,7 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
 
           {/* Analysis Results */}
           {showAnalysis && (
-            <div className="space-y-8 animate-fadeIn">
+            <div ref={resultsRef} className="space-y-8 animate-fadeIn">
               {/* Current Analysis */}
               <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
                 <h2 className="text-3xl font-bold text-white mb-6 font-sans">
