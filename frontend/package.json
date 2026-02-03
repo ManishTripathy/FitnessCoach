@@ -17,6 +17,8 @@
     "firebase": "^12.8.0",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
     "tailwind-merge": "^3.4.0",

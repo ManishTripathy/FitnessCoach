@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, ArrowLeft } from 'lucide-react';
 import { anonymousApi, observeApi } from '../services/api';
 import { AuthModal } from './AuthModal';
+import { WorkoutPlan } from './WorkoutPlan';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 interface PhotoUploadProps {
@@ -20,7 +21,64 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showWorkoutPlan, setShowWorkoutPlan] = useState(false);
+  const [selectedBodyType, setSelectedBodyType] = useState<number | null>(null);
+  const [isAISuggested, setIsAISuggested] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  const potentialBodies = [
+    {
+      type: 'Skinny',
+      goalKey: 'lean',
+      image: 'https://images.unsplash.com/photo-1544655709-85ac776c2f61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2lubnklMjBhdGhsZXRpYyUyMGJvZHklMjB0eXBlfGVufDF8fHx8MTc2OTk1MTUyN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      description: 'Lean & toned'
+    },
+    {
+      type: 'Shredded',
+      goalKey: 'athletic',
+      image: 'https://images.unsplash.com/photo-1738725602689-f260e7f528cd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaHJlZGRlZCUyMG11c2N1bGFyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      description: 'Defined & athletic'
+    },
+    {
+      type: 'Muscular',
+      goalKey: 'muscle',
+      image: 'https://images.unsplash.com/photo-1754475172820-6053bbed3b25?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtdXNjdWxhciUyMGJvZHlidWlsZGVyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      description: 'Powerful & built'
+    }
+  ];
+
+  const fitnessVideos = [
+    {
+      id: 1,
+      url: "https://images.unsplash.com/photo-1741156229623-da94e6d7977d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiaWNlcHMlMjB3b3Jrb3V0JTIwZ3ltfGVufDF8fHx8MTc2OTkyMDk1M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      alt: "Biceps workout"
+    },
+    {
+      id: 2,
+      url: "https://images.unsplash.com/photo-1499290572571-a48c08140a19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcXVhdCUyMGV4ZXJjaXNlJTIwZml0bmVzc3xlbnwxfHx8fDE3Njk4NjQ4MTZ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      alt: "Squat exercise"
+    },
+    {
+      id: 3,
+      url: "https://images.unsplash.com/photo-1729778783875-103c8545dc65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhdGhsZXRlJTIwc3dlYXRpbmclMjBpbnRlbnNlfGVufDF8fHx8MTc2OTkyMDk1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      alt: "Athlete sweating"
+    },
+    {
+      id: 4,
+      url: "https://images.unsplash.com/photo-1737736193172-f3b87a760ad5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxydW5uaW5nJTIwY2FyZGlvJTIwZml0bmVzc3xlbnwxfHx8fDE3Njk5MjA5NTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      alt: "Running cardio"
+    },
+    {
+      id: 5,
+      url: "https://images.unsplash.com/photo-1607909599990-e2c4778e546b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b2dhJTIwc3RyZXRjaCUyMGZsZXhpYmlsaXR5fGVufDF8fHx8MTc2OTkyMDk1NXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      alt: "Yoga stretch"
+    },
+    {
+      id: 6,
+      url: "https://images.unsplash.com/photo-1744551472900-d23f4997e1cd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZWFkbGlmdCUyMHN0cmVuZ3RoJTIwdHJhaW5pbmd8ZW58MXx8fHwxNzY5ODcyNjI2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      alt: "Deadlift training"
+    }
+  ];
 
   useEffect(() => {
     // Load session from local storage if exists
@@ -103,6 +161,20 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
       resultsRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [showAnalysis]);
+
+  const handleAISuggest = () => {
+    setSelectedBodyType(1); // Select the 2nd option (Shredded)
+    setIsAISuggested(true);
+  };
+
+  const handleBodyTypeSelect = (index: number) => {
+    setSelectedBodyType(index);
+    setIsAISuggested(false);
+  };
+
+  const handleContinue = () => {
+    setShowWorkoutPlan(true);
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -192,59 +264,14 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     }
   };
 
-  const fitnessVideos = [
-    {
-      id: 1,
-      url: "https://images.unsplash.com/photo-1741156229623-da94e6d7977d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiaWNlcHMlMjB3b3Jrb3V0JTIwZ3ltfGVufDF8fHx8MTc2OTkyMDk1M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      alt: "Biceps workout"
-    },
-    {
-      id: 2,
-      url: "https://images.unsplash.com/photo-1499290572571-a48c08140a19?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcXVhdCUyMGV4ZXJjaXNlJTIwZml0bmVzc3xlbnwxfHx8fDE3Njk4NjQ4MTZ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      alt: "Squat exercise"
-    },
-    {
-      id: 3,
-      url: "https://images.unsplash.com/photo-1729778783875-103c8545dc65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhdGhsZXRlJTIwc3dlYXRpbmclMjBpbnRlbnNlfGVufDF8fHx8MTc2OTkyMDk1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      alt: "Athlete sweating"
-    },
-    {
-      id: 4,
-      url: "https://images.unsplash.com/photo-1737736193172-f3b87a760ad5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxydW5uaW5nJTIwY2FyZGlvJTIwZml0bmVzc3xlbnwxfHx8fDE3Njk5MjA5NTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      alt: "Running cardio"
-    },
-    {
-      id: 5,
-      url: "https://images.unsplash.com/photo-1607909599990-e2c4778e546b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b2dhJTIwc3RyZXRjaCUyMGZsZXhpYmlsaXR5fGVufDF8fHx8MTc2OTkyMDk1NXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      alt: "Yoga stretch"
-    },
-    {
-      id: 6,
-      url: "https://images.unsplash.com/photo-1744551472900-d23f4997e1cd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZWFkbGlmdCUyMHN0cmVuZ3RoJTIwdHJhaW5pbmd8ZW58MXx8fHwxNzY5ODcyNjI2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      alt: "Deadlift training"
-    }
-  ];
-
-  const potentialBodies = [
-    {
-      type: 'Skinny',
-      goalKey: 'lean',
-      image: 'https://images.unsplash.com/photo-1544655709-85ac776c2f61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2lubnklMjBhdGhsZXRpYyUyMGJvZHklMjB0eXBlfGVufDF8fHx8MTc2OTk1MTUyN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      description: 'Lean & toned'
-    },
-    {
-      type: 'Shredded',
-      goalKey: 'athletic',
-      image: 'https://images.unsplash.com/photo-1738725602689-f260e7f528cd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaHJlZGRlZCUyMG11c2N1bGFyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      description: 'Defined & athletic'
-    },
-    {
-      type: 'Muscular',
-      goalKey: 'muscle',
-      image: 'https://images.unsplash.com/photo-1754475172820-6053bbed3b25?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtdXNjdWxhciUyMGJvZHlidWlsZGVyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      description: 'Powerful & built'
-    }
-  ];
+  if (showWorkoutPlan && selectedBodyType !== null) {
+    return (
+      <WorkoutPlan 
+        onBack={() => setShowWorkoutPlan(false)}
+        goalType={potentialBodies[selectedBodyType].type}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-black relative overflow-hidden">
@@ -481,55 +508,80 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
 
               {/* Potential Bodies */}
               <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 className="text-3xl font-bold text-white font-sans">
-                        Your Potential Transformations
-                        </h2>
-                        <p className="text-white/60 font-sans mt-2">
-                        Choose your goal body type and we'll create a personalized plan
-                        </p>
-                    </div>
-                    {!isLoggedIn && (
-                        <button 
-                            onClick={() => setIsAuthModalOpen(true)}
-                            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full font-semibold transition-colors"
-                        >
-                            Save Analysis & Continue
-                        </button>
-                    )}
+                <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 font-sans">
+                  Choose Your <span className="text-orange-500">Transformation Goal</span>
+                </h2>
+                <p className="text-xl text-white/90 mb-6 font-sans">
+                  Select your dream physique and Ryan will build a custom workout & nutrition plan to get you there 🔥
+                </p>
+                
+                {/* Suggest Me Button */}
+                <div className="mb-8">
+                  <button 
+                    onClick={handleAISuggest}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-4 rounded-full hover:from-orange-600 hover:to-red-600 transition-all shadow-lg hover:shadow-orange-500/50 font-bold text-lg font-sans flex items-center gap-2 mx-auto"
+                  >
+                    <span>✨</span>
+                    Not Sure? Let AI Suggest for Me
+                    <span>→</span>
+                  </button>
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-6">
-                  {potentialBodies.map((body) => (
-                    <div key={body.type} className="group relative rounded-2xl overflow-hidden aspect-[3/4] cursor-pointer border border-white/10 hover:border-orange-500/50 transition-all">
-                      <img
-                        src={generatedImages[body.goalKey] || body.image}
-                        alt={body.type}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                      
-                      {/* Loading Overlay */}
-                      {!generatedImages[body.goalKey] && isGenerating && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
-                              <div className="text-center">
-                                  <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                                  <p className="text-white/80 text-sm font-sans">Generating...</p>
-                              </div>
-                          </div>
+                  {potentialBodies.map((body, index) => (
+                    <button
+                      key={body.type}
+                      onClick={() => handleBodyTypeSelect(index)}
+                      className={`group relative bg-slate-900 rounded-2xl overflow-hidden transition-all hover:scale-[1.02] ${
+                        selectedBodyType === index 
+                          ? 'ring-4 ring-orange-500 scale-[1.02]' 
+                          : 'hover:ring-4 hover:ring-orange-500'
+                      }`}
+                    >
+                      {/* AI Suggested Badge */}
+                      {selectedBodyType === index && isAISuggested && (
+                        <div className="absolute top-4 right-4 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold z-10 shadow-lg font-sans flex items-center gap-1">
+                          <span>✨</span>
+                          AI Suggested
+                        </div>
                       )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6">
-                        <h3 className="text-2xl font-bold text-white font-sans mb-1">
-                          {body.type}
-                        </h3>
-                        <p className="text-white/80 font-sans text-sm">
-                          {body.description}
-                        </p>
+                      
+                      <div className="aspect-[3/4] overflow-hidden">
+                        <img
+                          src={generatedImages[body.goalKey] || body.image}
+                          alt={body.type}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
                       </div>
-                    </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
+                      <div className="absolute bottom-0 left-0 right-0 p-6 text-left">
+                        <h3 className="text-2xl font-bold text-white mb-1 font-sans">{body.type}</h3>
+                        <p className="text-white/80 text-sm font-sans">{body.description}</p>
+                        <div className={`mt-3 transition-opacity ${
+                          selectedBodyType === index 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}>
+                          <span className="text-orange-500 text-sm font-semibold font-sans">
+                            {selectedBodyType === index ? '✓ Selected' : 'Click to select →'}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
                   ))}
                 </div>
+
+                {/* Continue Button */}
+                {selectedBodyType !== null && (
+                  <div className="mt-8 text-center animate-fadeIn">
+                    <button 
+                      onClick={handleContinue}
+                      className="bg-orange-600 text-white px-12 py-4 rounded-full hover:bg-orange-700 transition-all shadow-lg font-bold text-lg font-sans"
+                    >
+                      Continue with {potentialBodies[selectedBodyType].type} Goal →
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
