@@ -3,13 +3,17 @@ from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
 from backend.services.firebase_service import save_anonymous_session, get_anonymous_session, delete_anonymous_session, get_bucket, get_db, download_file_as_bytes
-from backend.services.ai_service import analyze_body_image
+from backend.services.ai_service import analyze_body_image, generate_future_physique
 from backend.core.deps import verify_firebase_token
 
 router = APIRouter(prefix="/anonymous", tags=["anonymous"])
 
 class AnalyzeRequest(BaseModel):
     session_id: str
+
+class GenerateRequest(BaseModel):
+    session_id: str
+    goal: str
 
 class MigrateRequest(BaseModel):
     session_id: str
@@ -74,6 +78,52 @@ async def get_anonymous_results(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+@router.post("/generate")
+async def generate_anonymous_physique(request: GenerateRequest):
+    session = get_anonymous_session(request.session_id)
+    if not session or "storage_path" not in session:
+        raise HTTPException(status_code=404, detail="Session or photo not found")
+        
+    try:
+        # Download source image
+        image_bytes = download_file_as_bytes(session["storage_path"])
+        
+        # Generate
+        generated_bytes = generate_future_physique(image_bytes, request.goal)
+        
+        # Upload generated image
+        bucket = get_bucket()
+        filename = f"{uuid.uuid4()}.jpg"
+        save_path = f"anonymous/{request.session_id}/generated/{request.goal}_{filename}"
+        blob = bucket.blob(save_path)
+        blob.upload_from_string(generated_bytes, content_type="image/jpeg")
+        blob.make_public()
+        
+        # Save to session
+        # We want to append to a list or update a dict of generated images
+        current_generated = session.get("generated_images", [])
+        # Check if goal already exists and update it, or append
+        existing_idx = next((i for i, item in enumerate(current_generated) if item["goal"] == request.goal), -1)
+        
+        new_entry = {
+            "goal": request.goal,
+            "url": blob.public_url,
+            "path": save_path
+        }
+        
+        if existing_idx >= 0:
+            current_generated[existing_idx] = new_entry
+        else:
+            current_generated.append(new_entry)
+            
+        save_anonymous_session(request.session_id, {"generated_images": current_generated})
+        
+        return {"url": blob.public_url, "path": save_path, "goal": request.goal}
+        
+    except Exception as e:
+        print(f"Error in generate_anonymous_physique: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/migrate")
 async def migrate_anonymous_data(request: MigrateRequest, token=Depends(verify_firebase_token)):

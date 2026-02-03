@@ -6,6 +6,11 @@ export interface AnonymousSession {
   uploaded_photo_url?: string;
   analysis_results?: any;
   storage_path?: string;
+  generated_images?: {
+      goal: string;
+      url: string;
+      path: string;
+  }[];
 }
 
 export const anonymousApi = {
@@ -49,6 +54,22 @@ export const anonymousApi = {
     
     if (!response.ok) {
       throw new Error('Failed to fetch results');
+    }
+
+    return response.json();
+  },
+
+  generateTransformations: async (sessionId: string, goal: string): Promise<any> => {
+    const response = await fetch(`${API_BASE}/anonymous/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ session_id: sessionId, goal }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Generation failed');
     }
 
     return response.json();

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { anonymousApi, observeApi } from '../services/api';
 import { AuthModal } from './AuthModal';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -19,6 +18,8 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
+  const [isGenerating, setIsGenerating] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,6 +44,13 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
                   setAnalysisResults(data.analysis_results);
                   setShowAnalysis(true);
               }
+              if (data.generated_images && Array.isArray(data.generated_images)) {
+                  const images: Record<string, string> = {};
+                  data.generated_images.forEach((img: any) => {
+                      images[img.goal] = img.url;
+                  });
+                  setGeneratedImages(images);
+              }
               })
               .catch(err => {
               console.error("Failed to restore session", err);
@@ -65,6 +73,15 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
                 if (data.analysis_results) {
                   setAnalysisResults(data.analysis_results);
                   setShowAnalysis(true);
+                }
+                // Check if user scan has generated images (might be stored differently or same structure)
+                // Assuming same structure for now or adapting
+                if (data.generated_images && Array.isArray(data.generated_images)) {
+                    const images: Record<string, string> = {};
+                    data.generated_images.forEach((img: any) => {
+                        images[img.goal] = img.url;
+                    });
+                    setGeneratedImages(images);
                 }
                 setIsUploading(false);
             } catch (err) {
@@ -127,6 +144,24 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
       const results = await anonymousApi.analyzePhoto(sessionId);
       setAnalysisResults(results);
       setShowAnalysis(true);
+
+      // Trigger generation of potential transformations
+      setIsGenerating(true);
+      const goals = ['lean', 'athletic', 'muscle'];
+      
+      // We don't await this block to block the UI, but we want to show loading states
+      // Actually, we should probably await to ensure we catch errors, or handle promises individually
+      goals.forEach(async (goal) => {
+          try {
+              const res = await anonymousApi.generateTransformations(sessionId, goal);
+              setGeneratedImages(prev => ({
+                  ...prev,
+                  [goal]: res.url
+              }));
+          } catch (e) {
+              console.error(`Failed to generate ${goal}`, e);
+          }
+      });
 
       // If user is logged in, automatically migrate the new analysis to their profile
       const auth = getAuth();
@@ -193,16 +228,19 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const potentialBodies = [
     {
       type: 'Skinny',
+      goalKey: 'lean',
       image: 'https://images.unsplash.com/photo-1544655709-85ac776c2f61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2lubnklMjBhdGhsZXRpYyUyMGJvZHklMjB0eXBlfGVufDF8fHx8MTc2OTk1MTUyN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       description: 'Lean & toned'
     },
     {
       type: 'Shredded',
+      goalKey: 'athletic',
       image: 'https://images.unsplash.com/photo-1738725602689-f260e7f528cd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaHJlZGRlZCUyMG11c2N1bGFyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       description: 'Defined & athletic'
     },
     {
       type: 'Muscular',
+      goalKey: 'muscle',
       image: 'https://images.unsplash.com/photo-1754475172820-6053bbed3b25?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtdXNjdWxhciUyMGJvZHlidWlsZGVyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       description: 'Powerful & built'
     }
@@ -443,31 +481,53 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
 
               {/* Potential Bodies */}
               <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
-                <h2 className="text-3xl font-bold text-white mb-6 font-sans">
-                  Your Potential Transformations
-                </h2>
-                <p className="text-white/70 mb-8 font-sans">
-                  Choose your goal body type and we'll create a personalized plan
-                </p>
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-3xl font-bold text-white font-sans">
+                        Your Potential Transformations
+                        </h2>
+                        <p className="text-white/60 font-sans mt-2">
+                        Choose your goal body type and we'll create a personalized plan
+                        </p>
+                    </div>
+                    {!isLoggedIn && (
+                        <button 
+                            onClick={() => setIsAuthModalOpen(true)}
+                            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full font-semibold transition-colors"
+                        >
+                            Save Analysis & Continue
+                        </button>
+                    )}
+                </div>
+
                 <div className="grid md:grid-cols-3 gap-6">
                   {potentialBodies.map((body) => (
-                    <button
-                      key={body.type}
-                      className="group relative bg-slate-900 rounded-2xl overflow-hidden hover:ring-2 hover:ring-orange-500 transition-all"
-                    >
-                      <div className="aspect-[3/4] overflow-hidden">
-                        <img
-                          src={body.image}
-                          alt={body.type}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+                    <div key={body.type} className="group relative rounded-2xl overflow-hidden aspect-[3/4] cursor-pointer border border-white/10 hover:border-orange-500/50 transition-all">
+                      <img
+                        src={generatedImages[body.goalKey] || body.image}
+                        alt={body.type}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                      
+                      {/* Loading Overlay */}
+                      {!generatedImages[body.goalKey] && isGenerating && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                              <div className="text-center">
+                                  <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                  <p className="text-white/80 text-sm font-sans">Generating...</p>
+                              </div>
+                          </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6">
+                        <h3 className="text-2xl font-bold text-white font-sans mb-1">
+                          {body.type}
+                        </h3>
+                        <p className="text-white/80 font-sans text-sm">
+                          {body.description}
+                        </p>
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
-                      <div className="absolute bottom-0 left-0 right-0 p-6 text-left">
-                        <h3 className="text-2xl font-bold text-white mb-1 font-sans">{body.type}</h3>
-                        <p className="text-white/80 text-sm font-sans">{body.description}</p>
-                      </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
