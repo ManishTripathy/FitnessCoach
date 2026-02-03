@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, ArrowLeft } from 'lucide-react';
-import { anonymousApi, observeApi } from '../services/api';
+import { anonymousApi, observeApi, decideApi } from '../services/api';
 import { AuthModal } from './AuthModal';
 import { WorkoutPlan } from './WorkoutPlan';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -24,6 +24,7 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [showWorkoutPlan, setShowWorkoutPlan] = useState(false);
   const [selectedBodyType, setSelectedBodyType] = useState<number | null>(null);
   const [isAISuggested, setIsAISuggested] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const potentialBodies = [
@@ -159,9 +160,51 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     }
   }, [showAnalysis]);
 
-  const handleAISuggest = () => {
-    setSelectedBodyType(1); // Select the 2nd option (Shredded)
-    setIsAISuggested(true);
+  const handleAISuggest = async () => {
+    // Check if we have all generated images
+    const goals = ['lean', 'athletic', 'muscle'];
+    const hasAllImages = goals.every(g => generatedImages[g]);
+    
+    if (!hasAllImages) {
+        setError("Please wait for all transformations to generate first.");
+        return;
+    }
+
+    setIsSuggesting(true);
+    setError(null);
+
+    try {
+        let data;
+        if (isLoggedIn) {
+            data = await decideApi.suggestPath();
+        } else {
+            if (!sessionId) {
+                setError("No session found. Please upload a photo first.");
+                setIsSuggesting(false);
+                return;
+            }
+            data = await anonymousApi.suggestPath(sessionId);
+        }
+
+        const recommendedGoal = data.recommendation?.suggested_path;
+        
+        if (recommendedGoal) {
+            const index = potentialBodies.findIndex((b: any) => b.goalKey === recommendedGoal);
+            if (index !== -1) {
+                setSelectedBodyType(index);
+                setIsAISuggested(true);
+            } else {
+              setError("AI suggested a path that is not available.");
+            }
+        } else {
+           setError("AI could not make a suggestion.");
+        }
+    } catch (err) {
+        console.error("Suggestion failed", err);
+        setError("Failed to get AI suggestion. Please try again.");
+    } finally {
+        setIsSuggesting(false);
+    }
   };
 
   const handleBodyTypeSelect = (index: number) => {
@@ -539,11 +582,16 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
                 <div className="mb-8">
                   <button 
                     onClick={handleAISuggest}
-                    className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-4 rounded-full hover:from-orange-600 hover:to-red-600 transition-all shadow-lg hover:shadow-orange-500/50 font-bold text-lg font-sans flex items-center gap-2 mx-auto"
+                    disabled={isSuggesting}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-4 rounded-full hover:from-orange-600 hover:to-red-600 transition-all shadow-lg hover:shadow-orange-500/50 font-bold text-lg font-sans flex items-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    <span>✨</span>
-                    Not Sure? Let AI Suggest for Me
-                    <span>→</span>
+                    {isSuggesting ? (
+                      <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <span>✨</span>
+                    )}
+                    {isSuggesting ? 'Analyzing...' : 'Not Sure? Let AI Suggest for Me'}
+                    {!isSuggesting && <span>→</span>}
                   </button>
                 </div>
 

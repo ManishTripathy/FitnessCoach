@@ -58,7 +58,11 @@ def analyze_body_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dic
     - 'estimated_body_fat' (numeric percentage, e.g., 18)
     - 'estimated_muscle_mass' (numeric percentage, e.g., 42)
     - 'body_type_description' (e.g., 'Athletic', 'Soft', 'Muscular')
-    
+    - 'potential_bodies': List of 3 objects, each containing:
+        - 'type': Short Title (e.g., 'Lean & Toned', 'Powerlifter', 'Marathon Runner')
+        - 'goal_key': MUST be one of ['lean', 'athletic', 'muscle']. Use 'lean' for the slimmest/most toned option, 'athletic' for the balanced/fit option, and 'muscle' for the biggest/strongest option.
+        - 'visual_prompt': A detailed visual description of this target physique for an image generator (e.g., "A lean and toned physique with visible abs..."). This will be used internally.
+
     Do NOT provide medical advice. These are visual estimates only.
     """
     

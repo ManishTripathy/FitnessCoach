@@ -88,6 +88,22 @@ export const anonymousApi = {
     if (!response.ok) {
       throw new Error('Migration failed');
     }
+  },
+
+  suggestPath: async (sessionId: string): Promise<any> => {
+    const response = await fetch(`${API_BASE}/anonymous/suggest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get suggestion');
+    }
+
+    return response.json();
   }
 };
 
@@ -111,6 +127,30 @@ export const observeApi = {
     
     if (!response.ok) {
         throw new Error('Failed to fetch scan');
+    }
+    
+    return response.json();
+  }
+};
+
+export const decideApi = {
+  suggestPath: async (): Promise<any> => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('User not authenticated');
+    }
+    const token = await user.getIdToken();
+    
+    const response = await fetch(`${API_BASE}/decide/suggest`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+    
+    if (!response.ok) {
+        throw new Error('Failed to get suggestion');
     }
     
     return response.json();

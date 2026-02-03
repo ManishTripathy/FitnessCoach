@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
 from backend.services.firebase_service import save_anonymous_session, get_anonymous_session, delete_anonymous_session, get_bucket, get_db, download_file_as_bytes
-from backend.services.ai_service import analyze_body_image, generate_future_physique
+from backend.services.ai_service import analyze_body_image, generate_future_physique, recommend_fitness_path
 from backend.core.deps import verify_firebase_token
 
 router = APIRouter(prefix="/anonymous", tags=["anonymous"])
@@ -125,6 +125,56 @@ async def generate_anonymous_physique(request: GenerateRequest):
         print(f"Error in generate_anonymous_physique: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/suggest")
+async def suggest_anonymous_path(request: AnalyzeRequest):
+    session = get_anonymous_session(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if "storage_path" not in session:
+        raise HTTPException(status_code=400, detail="Original image not found in session.")
+        
+    original_path = session["storage_path"]
+    generated_images = session.get("generated_images", [])
+    
+    if len(generated_images) < 3:
+         raise HTTPException(status_code=400, detail="Missing generated images. Please wait for all transformations.")
+
+    # Map goals to paths
+    image_paths = {img['goal']: img['path'] for img in generated_images}
+    
+    if not all(k in image_paths for k in ['lean', 'athletic', 'muscle']):
+         raise HTTPException(status_code=400, detail="Missing one or more goal images.")
+
+    try:
+        import asyncio
+        # Download images (Parallel)
+        loop = asyncio.get_event_loop()
+        tasks = [
+            loop.run_in_executor(None, download_file_as_bytes, original_path),
+            loop.run_in_executor(None, download_file_as_bytes, image_paths['lean']),
+            loop.run_in_executor(None, download_file_as_bytes, image_paths['athletic']),
+            loop.run_in_executor(None, download_file_as_bytes, image_paths['muscle'])
+        ]
+        
+        results = await asyncio.gather(*tasks)
+        original_bytes, lean_bytes, athletic_bytes, muscle_bytes = results
+        
+        # Call AI Service
+        recommendation = await loop.run_in_executor(
+            None, 
+            recommend_fitness_path,
+            original_bytes, lean_bytes, athletic_bytes, muscle_bytes
+        )
+        
+        return recommendation
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/migrate")
 async def migrate_anonymous_data(request: MigrateRequest, token=Depends(verify_firebase_token)):
     session_id = request.session_id
@@ -149,8 +199,18 @@ async def migrate_anonymous_data(request: MigrateRequest, token=Depends(verify_f
         session['migrated_at'] = datetime.utcnow().isoformat()
         scan_ref.set(session)
         
-        # 2. Update user profile with latest scan if needed (optional but good for UX)
-        # For now, just ensuring data is linked is enough per requirements.
+        # 2. Update user_progress for the Decide phase
+        # Map anonymous session structure to user_progress structure
+        progress_data = {
+            "userId": user_id,
+            "originalImage": session.get("storage_path"),
+            "analysis": session.get("analysis_results", {}),
+            "generatedImages": session.get("generated_images", []),
+            "observeCompleted": True,
+            "decideCompleted": False,
+            "lastUpdated": datetime.utcnow()
+        }
+        db.collection("user_progress").document(user_id).set(progress_data, merge=True)
         
         # Clean up anonymous session
         delete_anonymous_session(session_id)
