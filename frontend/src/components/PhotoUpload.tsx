@@ -30,19 +30,16 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     {
       type: 'Skinny',
       goalKey: 'lean',
-      image: 'https://images.unsplash.com/photo-1544655709-85ac776c2f61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2lubnklMjBhdGhsZXRpYyUyMGJvZHklMjB0eXBlfGVufDF8fHx8MTc2OTk1MTUyN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       description: 'Lean & toned'
     },
     {
       type: 'Shredded',
       goalKey: 'athletic',
-      image: 'https://images.unsplash.com/photo-1738725602689-f260e7f528cd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaHJlZGRlZCUyMG11c2N1bGFyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       description: 'Defined & athletic'
     },
     {
       type: 'Muscular',
       goalKey: 'muscle',
-      image: 'https://images.unsplash.com/photo-1754475172820-6053bbed3b25?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtdXNjdWxhciUyMGJvZHlidWlsZGVyJTIwcGh5c2lxdWV8ZW58MXx8fHwxNzY5OTUxNTI4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       description: 'Powerful & built'
     }
   ];
@@ -212,10 +209,18 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
 
     setIsAnalyzing(true);
     setError(null);
+    setGeneratedImages({});
+    setAnalysisResults(null);
+    setShowAnalysis(true);
+
+    // Scroll immediately to show skeletons
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
     try {
       const results = await anonymousApi.analyzePhoto(sessionId);
       setAnalysisResults(results);
-      setShowAnalysis(true);
 
       // Trigger generation of potential transformations
       setIsGenerating(true);
@@ -468,43 +473,58 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
           {showAnalysis && (
             <div ref={resultsRef} className="space-y-8 animate-fadeIn">
               {/* Current Analysis */}
-              <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-3xl font-bold text-white font-sans">
-                    Current Body Analysis
-                    </h2>
-                    {!isLoggedIn && (
-                        <button 
-                            onClick={() => setIsAuthModalOpen(true)}
-                            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full font-semibold transition-colors"
-                        >
-                            Save Analysis & Continue
-                        </button>
-                    )}
+              {isAnalyzing ? (
+                <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10 animate-pulse">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="h-10 bg-white/10 rounded w-64"></div>
+                    <div className="h-10 bg-white/10 rounded-full w-48"></div>
+                  </div>
+                  <div className="h-24 bg-white/5 rounded-xl w-full mb-6"></div>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="bg-white/5 rounded-xl p-6 h-40 border border-white/5"></div>
+                    ))}
+                  </div>
                 </div>
-                
-                <p className="text-white/80 mb-6 font-sans text-lg italic">
-                    "{analysisResults?.reasoning || 'Analyzing...'}"
-                </p>
+              ) : (
+                <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
+                  <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-3xl font-bold text-white font-sans">
+                      Current Body Analysis
+                      </h2>
+                      {!isLoggedIn && (
+                          <button 
+                              onClick={() => setIsAuthModalOpen(true)}
+                              className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full font-semibold transition-colors"
+                          >
+                              Save Analysis & Continue
+                          </button>
+                      )}
+                  </div>
+                  
+                  <p className="text-white/80 mb-6 font-sans text-lg italic">
+                      "{analysisResults?.reasoning || 'Analyzing...'}"
+                  </p>
 
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
-                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Category</div>
-                    <div className="text-4xl font-black text-white font-sans">{analysisResults?.category || 'N/A'}</div>
-                    <div className="text-white/60 text-sm mt-1 font-sans">{analysisResults?.body_type_description || 'Analysis'}</div>
-                  </div>
-                  <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
-                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Body Fat (Est.)</div>
-                    <div className="text-4xl font-black text-white font-sans">{analysisResults?.estimated_body_fat || '18'}%</div>
-                    <div className="text-white/60 text-sm mt-1 font-sans">Approximate</div>
-                  </div>
-                  <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
-                    <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Muscle Mass (Est.)</div>
-                    <div className="text-4xl font-black text-white font-sans">{analysisResults?.estimated_muscle_mass || '42'}%</div>
-                    <div className="text-white/60 text-sm mt-1 font-sans">Approximate</div>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
+                      <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Category</div>
+                      <div className="text-4xl font-black text-white font-sans">{analysisResults?.category || 'N/A'}</div>
+                      <div className="text-white/60 text-sm mt-1 font-sans">{analysisResults?.body_type_description || 'Analysis'}</div>
+                    </div>
+                    <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
+                      <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Body Fat (Est.)</div>
+                      <div className="text-4xl font-black text-white font-sans">{analysisResults?.estimated_body_fat || '18'}%</div>
+                      <div className="text-white/60 text-sm mt-1 font-sans">Approximate</div>
+                    </div>
+                    <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/20">
+                      <div className="text-orange-400 text-sm font-semibold mb-2 font-sans">Muscle Mass (Est.)</div>
+                      <div className="text-4xl font-black text-white font-sans">{analysisResults?.estimated_muscle_mass || '42'}%</div>
+                      <div className="text-white/60 text-sm mt-1 font-sans">Approximate</div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Potential Bodies */}
               <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
@@ -546,12 +566,20 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
                         </div>
                       )}
                       
-                      <div className="aspect-[3/4] overflow-hidden">
-                        <img
-                          src={generatedImages[body.goalKey] || body.image}
-                          alt={body.type}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+                      <div className="aspect-[3/4] overflow-hidden relative bg-slate-800">
+                        {generatedImages[body.goalKey] ? (
+                          <img
+                            src={generatedImages[body.goalKey]}
+                            alt={body.type}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 animate-pulse">
+                            <div className="w-12 h-12 border-4 border-white/10 border-t-orange-500 rounded-full animate-spin mb-4"></div>
+                            <p className="text-white/60 text-sm font-sans font-medium text-center">Generating AI Look...</p>
+                            <p className="text-white/40 text-xs font-sans mt-2">~1-2 mins</p>
+                          </div>
+                        )}
                       </div>
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
                       <div className="absolute bottom-0 left-0 right-0 p-6 text-left">
