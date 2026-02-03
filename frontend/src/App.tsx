@@ -6,6 +6,7 @@ import Observe from './pages/Observe';
 import Decide from './pages/Decide';
 import Act from './pages/Act';
 import Landing from './pages/Landing';
+import AnonymousPlan from './pages/AnonymousPlan';
 import { useAuth } from './auth/AuthContext';
 
 
@@ -29,6 +30,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/analyze" element={<PhotoUpload onBack={() => window.location.href = '/'} />} />
+        <Route path="/plan/:goal" element={<AnonymousPlan />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route 

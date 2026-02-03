@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Camera, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { anonymousApi, observeApi, decideApi } from '../services/api';
 import { AuthModal } from './AuthModal';
-import { WorkoutPlan } from './WorkoutPlan';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 interface PhotoUploadProps {
@@ -21,11 +21,11 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showWorkoutPlan, setShowWorkoutPlan] = useState(false);
   const [selectedBodyType, setSelectedBodyType] = useState<number | null>(null);
   const [isAISuggested, setIsAISuggested] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   const potentialBodies = [
     {
@@ -213,7 +213,10 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   };
 
   const handleContinue = () => {
-    setShowWorkoutPlan(true);
+    if (selectedBodyType !== null) {
+      const goalKey = potentialBodies[selectedBodyType].type.toLowerCase();
+      navigate(`/plan/${goalKey}`);
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -311,15 +314,6 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
       setIsAnalyzing(false);
     }
   };
-
-  if (showWorkoutPlan && selectedBodyType !== null) {
-    return (
-      <WorkoutPlan 
-        onBack={() => setShowWorkoutPlan(false)}
-        goalType={potentialBodies[selectedBodyType].type}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen w-full bg-black relative overflow-hidden">
