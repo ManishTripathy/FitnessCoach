@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from backend.services.firebase_service import save_anonymous_session, get_anonymous_session, delete_anonymous_session, get_bucket, get_db, download_file_as_bytes
 from backend.services.ai_service import analyze_body_image, generate_future_physique, recommend_fitness_path, generate_weekly_plan_rag
-from backend.services.mock_service import try_get_mock_plan
+from backend.services.mock_service import try_get_mock_plan, try_get_mock_analyze, try_get_mock_generate, try_get_mock_suggest
 from backend.core.deps import verify_firebase_token
 from backend.core.config import settings
 
@@ -55,6 +55,11 @@ async def upload_anonymous_photo(file: UploadFile = File(...), session_id: str =
 
 @router.post("/analyze")
 async def analyze_anonymous(request: AnalyzeRequest):
+    mock_res = try_get_mock_analyze("Anonymous")
+    if mock_res:
+        save_anonymous_session(request.session_id, {"analysis_results": mock_res})
+        return mock_res
+
     session = get_anonymous_session(request.session_id)
     if not session or "storage_path" not in session:
         raise HTTPException(status_code=404, detail="Session or photo not found")
@@ -88,6 +93,28 @@ async def get_anonymous_results(session_id: str):
 
 @router.post("/generate")
 async def generate_anonymous_physique(request: GenerateRequest):
+    mock_res = try_get_mock_generate("Anonymous")
+    if mock_res:
+        # We need to simulate the saving logic too
+        session = get_anonymous_session(request.session_id)
+        if not session:
+             raise HTTPException(status_code=404, detail="Session not found")
+             
+        current_generated = session.get("generated_images", [])
+        existing_idx = next((i for i, item in enumerate(current_generated) if item["goal"] == request.goal), -1)
+        
+        # Override mock goal with requested goal
+        new_entry = mock_res.copy()
+        new_entry["goal"] = request.goal
+        
+        if existing_idx >= 0:
+            current_generated[existing_idx] = new_entry
+        else:
+            current_generated.append(new_entry)
+            
+        save_anonymous_session(request.session_id, {"generated_images": current_generated})
+        return new_entry
+
     session = get_anonymous_session(request.session_id)
     if not session or "storage_path" not in session:
         raise HTTPException(status_code=404, detail="Session or photo not found")
@@ -134,6 +161,10 @@ async def generate_anonymous_physique(request: GenerateRequest):
 
 @router.post("/suggest")
 async def suggest_anonymous_path(request: AnalyzeRequest):
+    mock_res = try_get_mock_suggest("Anonymous")
+    if mock_res:
+        return mock_res
+
     session = get_anonymous_session(request.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

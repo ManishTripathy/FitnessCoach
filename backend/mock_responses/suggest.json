@@ -1,0 +1,22 @@
+{
+    "lean": {
+        "time_estimate": "9-12 months",
+        "effort_level": "High",
+        "description": "Achieving a 'Lean & Toned' physique will require a significant reduction in body fat percentage while maintaining muscle mass. This necessitates a disciplined approach to diet, including calorie tracking and macro management, combined with a consistent weightlifting and cardio routine."
+    },
+    "athletic": {
+        "time_estimate": "6-9 months",
+        "effort_level": "Moderate",
+        "description": "An 'Athletic Build' focuses on improved fitness and a more defined physique without prioritizing extreme leanness. This involves a balanced diet, regular strength training, and incorporating activities like running, swimming, or sports to enhance overall athleticism."
+    },
+    "muscle": {
+        "time_estimate": "12-18 months",
+        "effort_level": "Extreme",
+        "description": "Gaining a considerable amount of muscle mass and achieving a physique similar to the 'Muscle Gain' goal will require a dedicated bulking phase with a caloric surplus, followed by a cutting phase to reveal the muscle. This demands meticulous tracking of calories and macronutrients, intense weightlifting, and sufficient rest and recovery."
+    },
+    "recommendation": {
+        "suggested_path": "athletic",
+        "reasoning": "Starting with the 'Athletic Build' is the most sustainable approach. It provides a good balance between improving fitness, building some muscle, and reducing body fat. This path sets a solid foundation for potentially pursuing the 'Lean & Toned' or 'Muscle Gain' goals later on, as it establishes healthy habits and a consistent workout routine. It is more realistic and achievable in the short term.",
+        "confidence_score": 0.8
+    }
+}

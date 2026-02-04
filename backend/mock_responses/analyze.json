@@ -1,0 +1,24 @@
+{
+    "category": "Overfat",
+    "reasoning": "The individual exhibits higher body fat with limited muscle visibility, indicating an overfat physique.",
+    "estimated_body_fat": 28,
+    "estimated_muscle_mass": 35,
+    "body_type_description": "Soft",
+    "potential_bodies": [
+        {
+            "type": "Lean & Toned",
+            "goal_key": "lean",
+            "visual_prompt": "A lean and toned physique with visible abs, defined chest, and toned legs."
+        },
+        {
+            "type": "Athletic Build",
+            "goal_key": "athletic",
+            "visual_prompt": "An athletic build with balanced muscle mass, moderate definition, and functional fitness."
+        },
+        {
+            "type": "Muscular Strength",
+            "goal_key": "muscle",
+            "visual_prompt": "A muscular physique with increased muscle mass, powerlifter build, and strong definition."
+        }
+    ]
+}

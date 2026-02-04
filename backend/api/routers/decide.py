@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from backend.core.deps import verify_firebase_token
 from backend.services.firebase_service import get_db, download_file_as_bytes
 from backend.services.ai_service import recommend_fitness_path
+from backend.services.mock_service import try_get_mock_suggest
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import datetime
@@ -72,6 +73,10 @@ async def get_state(token: dict = Depends(verify_firebase_token)):
 
 @router.post("/suggest")
 async def suggest_path(token: dict = Depends(verify_firebase_token)):
+    mock_res = try_get_mock_suggest("User")
+    if mock_res:
+        return mock_res
+
     try:
         user_id = token['uid']
         db = get_db()

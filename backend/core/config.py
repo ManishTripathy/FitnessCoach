@@ -13,5 +13,8 @@ class Settings:
     FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET")
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     USE_MOCK_PLAN = os.getenv("USE_MOCK_PLAN", "false").lower() == "true"
+    USE_MOCK_ANALYZE = os.getenv("USE_MOCK_ANALYZE", "false").lower() == "true"
+    USE_MOCK_SUGGEST = os.getenv("USE_MOCK_SUGGEST", "false").lower() == "true"
+    USE_MOCK_GENERATE = os.getenv("USE_MOCK_GENERATE", "false").lower() == "true"
 
 settings = Settings()

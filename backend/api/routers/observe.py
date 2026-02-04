@@ -6,6 +6,7 @@ import uuid
 from backend.core.deps import verify_firebase_token
 from backend.services.firebase_service import download_file_as_bytes, get_bucket, get_db
 from backend.services.ai_service import analyze_body_image, generate_future_physique
+from backend.services.mock_service import try_get_mock_analyze, try_get_mock_generate
 
 router = APIRouter(prefix="/observe", tags=["observe"])
 
@@ -18,6 +19,10 @@ class GenerateRequest(BaseModel):
 
 @router.post("/analyze")
 async def analyze_body(request: AnalyzeRequest, token=Depends(verify_firebase_token)):
+    mock_res = try_get_mock_analyze("User")
+    if mock_res:
+        return mock_res
+
     try:
         # 1. Download image
         image_bytes = download_file_as_bytes(request.storage_path)
@@ -46,6 +51,13 @@ async def get_scan(scan_id: str, token=Depends(verify_firebase_token)):
 
 @router.post("/generate")
 async def generate_physique(request: GenerateRequest, token=Depends(verify_firebase_token)):
+    mock_res = try_get_mock_generate("User")
+    if mock_res:
+        # Override mock goal with requested goal
+        mock_res_copy = mock_res.copy()
+        mock_res_copy["goal"] = request.goal
+        return mock_res_copy
+
     try:
         print(f"Generating physique for goal: {request.goal}")
         # 1. Download source image
