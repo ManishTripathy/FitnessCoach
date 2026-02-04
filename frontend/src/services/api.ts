@@ -104,6 +104,22 @@ export const anonymousApi = {
     }
 
     return response.json();
+  },
+
+  generatePlan: async (goal: string): Promise<any> => {
+    const response = await fetch(`${API_BASE}/anonymous/plan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ goal }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate plan');
+    }
+
+    return response.json();
   }
 };
 

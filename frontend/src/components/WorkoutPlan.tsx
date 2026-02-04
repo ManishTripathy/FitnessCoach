@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, GripVertical, Play, MessageCircle, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, GripVertical, Play, MessageCircle, X, AlertCircle } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { anonymousApi } from '../services/api';
 
 interface WorkoutPlanProps {
   onBack: () => void;
@@ -306,77 +307,66 @@ function WorkoutCard({ day, index, moveCard }: { day: WorkoutDay; index: number;
 
 function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [workoutDays, setWorkoutDays] = useState<WorkoutDay[]>([]);
+  const fetchedGoal = useRef<string | null>(null);
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
-      setWorkoutDays([
-        {
-          id: '1',
-          day: 1,
-          title: 'Upper Body Strength',
-          exercises: 'Bench Press, Pull-ups, Shoulder Press',
-          duration: '45-60 min',
-          thumbnail: 'https://images.unsplash.com/photo-1651346847980-ab1c883e8cc8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZW5jaCUyMHByZXNzJTIwd29ya291dHxlbnwxfHx8fDE3NzAwOTA5Nzd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-          isRestDay: false,
-        },
-        {
-          id: '2',
-          day: 2,
-          title: 'Lower Body Power',
-          exercises: 'Squats, Deadlifts, Lunges',
-          duration: '50-65 min',
-          thumbnail: 'https://images.unsplash.com/photo-1683147779485-24912f480130?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzcXVhdCUyMHdvcmtvdXQlMjBneW18ZW58MXx8fHwxNzcwMDkwOTc3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-          isRestDay: false,
-        },
-        {
-          id: '3',
-          day: 3,
-          title: 'Rest & Recovery',
-          exercises: '',
-          duration: '',
-          isRestDay: true,
-        },
-        {
-          id: '4',
-          day: 4,
-          title: 'Cardio & Core',
-          exercises: 'HIIT Running, Planks, Mountain Climbers',
-          duration: '35-45 min',
-          thumbnail: 'https://images.unsplash.com/photo-1761971974992-6df33df97c3a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjYXJkaW8lMjBydW5uaW5nJTIwdHJlYWRtaWxsfGVufDF8fHx8MTc3MDAyODQ5Mnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-          isRestDay: false,
-        },
-        {
-          id: '5',
-          day: 5,
-          title: 'Full Body Circuit',
-          exercises: 'Push-ups, Pull-ups, Burpees, Jump Squats',
-          duration: '40-50 min',
-          thumbnail: 'https://images.unsplash.com/photo-1686247166156-0bca3e8b55d9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwdXNoJTIwdXBzJTIwZXhlcmNpc2V8ZW58MXx8fHwxNzcwMDI5NjgxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-          isRestDay: false,
-        },
-        {
-          id: '6',
-          day: 6,
-          title: 'Active Recovery',
-          exercises: '',
-          duration: '',
-          isRestDay: true,
-        },
-        {
-          id: '7',
-          day: 7,
-          title: 'Shoulder & Back Focus',
-          exercises: 'Overhead Press, Rows, Lateral Raises',
-          duration: '45-55 min',
-          thumbnail: 'https://images.unsplash.com/photo-1630415188550-9e454489ce3a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzaG91bGRlciUyMHByZXNzJTIwd29ya291dHxlbnwxfHx8fDE3NzAwOTA5ODN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-          isRestDay: false,
-        },
-      ]);
-      setIsLoading(false);
-    }, 2000);
-  }, []);
+    if (fetchedGoal.current === goalType) return;
+    fetchedGoal.current = goalType;
+
+    const getYoutubeThumbnail = (url: string) => {
+      try {
+        // Handle standard youtube URLs
+        const videoIdMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+        if (videoIdMatch && videoIdMatch[1]) {
+          return `https://img.youtube.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const fetchPlan = async () => {
+      try {
+        setIsLoading(true);
+        const data = await anonymousApi.generatePlan(goalType);
+        
+        if (data && data.schedule) {
+          const mappedDays: WorkoutDay[] = data.schedule.map((day: any) => {
+            const details = day.workout_details || {};
+            // Use provided thumbnail, or extract from YouTube URL, or use a default fallback
+            const thumbnail = details.thumbnail_url || 
+                            (details.url ? getYoutubeThumbnail(details.url) : null) || 
+                            'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1080';
+
+            return {
+              id: day.workout_id || `day-${day.day}`,
+              day: day.day,
+              title: day.focus || details.title || `Day ${day.day}`,
+              exercises: Array.isArray(details.exercises) 
+                ? details.exercises.join(', ') 
+                : (details.exercises || ''),
+              duration: details.duration || '',
+              thumbnail: thumbnail,
+              isRestDay: day.is_rest || false,
+            };
+          });
+          setWorkoutDays(mappedDays);
+        }
+      } catch (err) {
+        console.error('Error fetching plan:', err);
+        setError('Failed to generate your workout plan. Please try again.');
+        // Reset the ref so we can try again if the component doesn't unmount
+        fetchedGoal.current = null;
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPlan();
+  }, [goalType]);
 
   const moveCard = (dragIndex: number, hoverIndex: number) => {
     const dragCard = workoutDays[dragIndex];
@@ -474,6 +464,23 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
             </p>
           </div>
 
+          {/* Error State */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded-2xl p-6 text-center space-y-4">
+              <div className="flex justify-center">
+                <AlertCircle className="w-12 h-12 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Oops! Something went wrong</h3>
+              <p className="text-white/70">{error}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="bg-red-500 text-white px-6 py-2 rounded-full font-bold hover:bg-red-600 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
           {/* Loading State */}
           {isLoading && (
             <div className="space-y-4">
@@ -496,7 +503,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
           )}
 
           {/* Workout Cards */}
-          {!isLoading && (
+          {!isLoading && !error && (
             <div className="space-y-4">
               {workoutDays.map((day, index) => (
                 <WorkoutCard
@@ -510,7 +517,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
           )}
 
           {/* Start Program Button */}
-          {!isLoading && (
+          {!isLoading && !error && (
             <div className="text-center pt-4">
               <button className="bg-orange-600 text-white px-12 py-4 rounded-full hover:bg-orange-700 transition-all shadow-lg font-bold text-lg font-sans">
                 Start My Program 🔥

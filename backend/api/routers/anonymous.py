@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
 from backend.services.firebase_service import save_anonymous_session, get_anonymous_session, delete_anonymous_session, get_bucket, get_db, download_file_as_bytes
-from backend.services.ai_service import analyze_body_image, generate_future_physique, recommend_fitness_path
+from backend.services.ai_service import analyze_body_image, generate_future_physique, recommend_fitness_path, generate_weekly_plan_rag
 from backend.core.deps import verify_firebase_token
 
 router = APIRouter(prefix="/anonymous", tags=["anonymous"])
@@ -13,6 +13,9 @@ class AnalyzeRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     session_id: str
+    goal: str
+
+class PlanRequest(BaseModel):
     goal: str
 
 class MigrateRequest(BaseModel):
@@ -174,6 +177,49 @@ async def suggest_anonymous_path(request: AnalyzeRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/plan")
+async def generate_anonymous_plan(request: PlanRequest):
+    try:
+        db = get_db()
+        
+        # 1. Fetch Workouts from Library
+        workouts_ref = db.collection("workout_library").stream()
+        workout_library = []
+        workout_map = {} 
+        
+        for doc in workouts_ref:
+            w_data = doc.to_dict()
+            w_data['id'] = doc.id
+            if 'embedding' in w_data:
+                del w_data['embedding']
+            workout_library.append(w_data)
+            workout_map[doc.id] = w_data
+
+        if not workout_library:
+            raise HTTPException(status_code=500, detail="Workout library is empty.")
+
+        # 2. Generate Plan via AI
+        ai_result = generate_weekly_plan_rag(request.goal, workout_library)
+        
+        # 3. Enrich plan
+        enriched_schedule = []
+        for day in ai_result.get("schedule", []):
+            if not day.get("is_rest") and day.get("workout_id"):
+                w_id = day["workout_id"]
+                if w_id in workout_map:
+                    day["workout_details"] = workout_map[w_id]
+            enriched_schedule.append(day)
+            
+        ai_result["schedule"] = enriched_schedule
+        ai_result["generated_at"] = datetime.utcnow().isoformat()
+        
+        return ai_result
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/migrate")
 async def migrate_anonymous_data(request: MigrateRequest, token=Depends(verify_firebase_token)):
