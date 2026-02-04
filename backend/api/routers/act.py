@@ -2,9 +2,13 @@ from fastapi import APIRouter, HTTPException, Depends
 from backend.core.deps import verify_firebase_token
 from backend.services.ai_service import generate_weekly_plan_rag
 from backend.services.firebase_service import get_db
+from backend.services.mock_service import try_get_mock_plan
+from backend.core.config import settings
 from pydantic import BaseModel
 from typing import List, Optional
 import datetime
+import os
+import json
 
 router = APIRouter(prefix="/act", tags=["act"])
 
@@ -20,6 +24,23 @@ async def generate_plan(
         user_id = token['uid']
         db = get_db()
         
+        # Mock Response if enabled
+        mock_plan = try_get_mock_plan("User")
+        if mock_plan:
+            # Update generated_at for realism
+            mock_plan["generated_at"] = datetime.datetime.utcnow().isoformat()
+            
+            # Save to Firestore (to mimic real behavior)
+            user_ref = db.collection("user_progress").document(user_id)
+            user_ref.set({
+                "weeklyPlan": mock_plan,
+                "actPhaseStarted": True,
+                "lastUpdated": datetime.datetime.utcnow()
+            }, merge=True)
+            
+            return {"status": "success", "plan": mock_plan}
+
+        print(f"[{datetime.datetime.utcnow().isoformat()}] MODE: AI - Generating User Plan")
         # 1. Check if plan already exists and not forcing refresh
         user_ref = db.collection("user_progress").document(user_id)
         user_doc = user_ref.get()

@@ -1,0 +1,138 @@
+{ 
+    "weekly_focus": "This week focuses on building muscle and burning fat to achieve a shredded physique by combining strength training with HIIT cardio and prioritizing recovery.", 
+    "schedule": [ 
+        { 
+            "day": 1, 
+            "day_name": "Monday", 
+            "workout_id": "cg_full_2", 
+            "activity": "45 MIN IRON SERIES FULL BODY WORKOUT", 
+            "is_rest": false, 
+            "notes": "Full body strength training to kickstart the week.", 
+            "workout_details": { 
+                "created_at": "2026-01-31T07:28:17.769000+00:00", 
+                "id": "cg_full_2", 
+                "description": "A longer, slower-paced strength session from the Iron Series. Focuses on muscle building and controlled movements.", 
+                "duration_mins": 45, 
+                "title": "45 MIN IRON SERIES FULL BODY WORKOUT | Caroline Girvan", 
+                "trainer": "Caroline Girvan", 
+                "focus": [ 
+                    "Full Body", 
+                    "Strength", 
+                    "Hypertrophy" 
+                ], 
+                "url": "https://www.youtube.com/watch?v=xVj2Q2_2EJY", 
+                "difficulty": "Advanced" 
+            } 
+        }, 
+        { 
+            "day": 2, 
+            "day_name": "Tuesday", 
+            "workout_id": "cg_legs_1", 
+            "activity": "30 MIN DUMBBELL LEG WORKOUT", 
+            "is_rest": false, 
+            "notes": "Target legs and glutes for hypertrophy.", 
+            "workout_details": { 
+                "difficulty": "Intermediate", 
+                "created_at": "2026-01-31T07:28:16.393000+00:00", 
+                "id": "cg_legs_1", 
+                "description": "Focused leg day using dumbbells. Targets quads, hamstrings and glutes for building definition and strength.", 
+                "duration_mins": 30, 
+                "title": "30 MIN DUMBBELL LEG WORKOUT | Caroline Girvan", 
+                "trainer": "Caroline Girvan", 
+                "focus": [ 
+                    "Legs", 
+                    "Glutes", 
+                    "Strength", 
+                    "Dumbbells" 
+                ], 
+                "url": "https://www.youtube.com/watch?v=4Tz1LqGkQ9E" 
+            } 
+        }, 
+        { 
+            "day": 3, 
+            "day_name": "Wednesday", 
+            "workout_id": "cg_hiit_1", 
+            "activity": "15 MIN HIIT CARDIO WORKOUT", 
+            "is_rest": false, 
+            "notes": "HIIT to burn fat and improve cardiovascular fitness.", 
+            "workout_details": { 
+                "difficulty": "High", 
+                "created_at": "2026-01-31T07:28:17.081000+00:00", 
+                "id": "cg_hiit_1", 
+                "description": "High Intensity Interval Training to burn calories and improve cardiovascular health. No equipment needed.", 
+                "duration_mins": 15, 
+                "title": "15 MIN HIIT CARDIO WORKOUT | No Equipment | Caroline Girvan", 
+                "trainer": "Caroline Girvan", 
+                "focus": [ 
+                    "Cardio", 
+                    "HIIT", 
+                    "Fat Loss" 
+                ], 
+                "url": "https://www.youtube.com/watch?v=M0uO8X3_tEA" 
+            } 
+        }, 
+        { 
+            "day": 4, 
+            "day_name": "Thursday", 
+            "workout_id": "cg_upper_1", 
+            "activity": "15 MIN UPPER BODY WORKOUT - Shoulders & Arms", 
+            "is_rest": false, 
+            "notes": "Focus on upper body strength and muscle definition.", 
+            "workout_details": { 
+                "difficulty": "Intermediate", 
+                "created_at": "2026-01-31T07:28:16.757000+00:00", 
+                "id": "cg_upper_1", 
+                "description": "Quick but intense upper body blast focusing on sculpting shoulders and arms.", 
+                "duration_mins": 15, 
+                "title": "15 MIN UPPER BODY WORKOUT - Shoulders & Arms | Caroline Girvan", 
+                "trainer": "Caroline Girvan", 
+                "focus": [ 
+                    "Upper Body", 
+                    "Arms", 
+                    "Shoulders", 
+                    "Dumbbells" 
+                ], 
+                "url": "https://www.youtube.com/watch?v=u31qwQUeGuM" 
+            } 
+        }, 
+        { 
+            "day": 5, 
+            "day_name": "Friday", 
+            "workout_id": "cg_full_2", 
+            "activity": "45 MIN IRON SERIES FULL BODY WORKOUT", 
+            "is_rest": false, 
+            "notes": "Second full body workout of the week, focusing on overall strength.", 
+            "workout_details": { 
+                "created_at": "2026-01-31T07:28:17.769000+00:00", 
+                "id": "cg_full_2", 
+                "description": "A longer, slower-paced strength session from the Iron Series. Focuses on muscle building and controlled movements.", 
+                "duration_mins": 45, 
+                "title": "45 MIN IRON SERIES FULL BODY WORKOUT | Caroline Girvan", 
+                "trainer": "Caroline Girvan", 
+                "focus": [ 
+                    "Full Body", 
+                    "Strength", 
+                    "Hypertrophy" 
+                ], 
+                "url": "https://www.youtube.com/watch?v=xVj2Q2_2EJY", 
+                "difficulty": "Advanced" 
+            } 
+        }, 
+        { 
+            "day": 6, 
+            "day_name": "Saturday", 
+            "workout_id": "cg_stretch_1", 
+            "activity": "20 MIN FULL BODY STRETCH & COOL DOWN", 
+            "is_rest": true, 
+            "notes": "Active recovery day to improve flexibility and reduce muscle soreness." 
+        }, 
+        { 
+            "day": 7, 
+            "day_name": "Sunday", 
+            "workout_id": null, 
+            "activity": "Rest Day", 
+            "is_rest": true, 
+            "notes": "Complete rest to allow for full recovery." 
+        } 
+    ]
+}

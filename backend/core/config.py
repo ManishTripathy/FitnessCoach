@@ -12,5 +12,6 @@ class Settings:
     FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", os.path.join(BASE_DIR, "firebase-credentials.json"))
     FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET")
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+    USE_MOCK_PLAN = os.getenv("USE_MOCK_PLAN", "false").lower() == "true"
 
 settings = Settings()

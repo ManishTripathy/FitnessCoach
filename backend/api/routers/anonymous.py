@@ -1,10 +1,14 @@
+import json
+import os
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
 from backend.services.firebase_service import save_anonymous_session, get_anonymous_session, delete_anonymous_session, get_bucket, get_db, download_file_as_bytes
 from backend.services.ai_service import analyze_body_image, generate_future_physique, recommend_fitness_path, generate_weekly_plan_rag
+from backend.services.mock_service import try_get_mock_plan
 from backend.core.deps import verify_firebase_token
+from backend.core.config import settings
 
 router = APIRouter(prefix="/anonymous", tags=["anonymous"])
 
@@ -180,6 +184,11 @@ async def suggest_anonymous_path(request: AnalyzeRequest):
 
 @router.post("/plan")
 async def generate_anonymous_plan(request: PlanRequest):
+    mock_plan = try_get_mock_plan("Anonymous")
+    if mock_plan:
+        return mock_plan
+
+    print(f"[{datetime.utcnow().isoformat()}] MODE: AI - Generating Anonymous Plan")
     try:
         db = get_db()
         
