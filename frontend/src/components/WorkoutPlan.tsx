@@ -342,7 +342,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
                             'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1080';
 
             return {
-              id: day.workout_id || `day-${day.day}`,
+              id: `day-${day.day}`,
               day: day.day,
               title: day.focus || details.title || `Day ${day.day}`,
               exercises: Array.isArray(details.exercises) 
