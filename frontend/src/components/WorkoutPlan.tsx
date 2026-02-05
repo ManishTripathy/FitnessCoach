@@ -16,6 +16,7 @@ interface WorkoutDay {
   exercises: string;
   duration: string;
   thumbnail?: string;
+  videoUrl?: string;
   isRestDay: boolean;
 }
 
@@ -443,7 +444,15 @@ function WorkoutCard({
 
           {/* Thumbnail */}
           {!day.isRestDay && day.thumbnail && (
-            <div className="relative flex-shrink-0 w-full sm:w-32 h-32 sm:h-20 rounded-lg overflow-hidden bg-slate-800">
+            <a 
+              href={day.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`relative flex-shrink-0 w-full sm:w-32 h-32 sm:h-20 rounded-lg overflow-hidden bg-slate-800 block ${
+                !day.videoUrl ? 'pointer-events-none' : 'cursor-pointer'
+              }`}
+            >
               <img
                 src={day.thumbnail}
                 alt={day.title}
@@ -455,7 +464,7 @@ function WorkoutCard({
                   <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
                 </div>
               </div>
-            </div>
+            </a>
           )}
 
           {/* Rest Day Icon */}
@@ -641,6 +650,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
                 : (details.exercises || ''),
               duration: details.duration || '',
               thumbnail: thumbnail,
+              videoUrl: details.url || null,
               isRestDay: day.is_rest || false,
             };
           });
