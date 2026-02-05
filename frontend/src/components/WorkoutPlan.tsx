@@ -88,6 +88,14 @@ function ChatSticky({ day, onClose, onExpand, cardRef, messages, onSendMessage }
     }
   };
 
+  const hasUserMessage = messages.some(m => m.sender === 'user');
+
+  const quickPrompts = [
+    'Suggest shorter version',
+    'Too intense',
+    'Something easier',
+  ];
+
   return (
     <div 
       className="fixed z-40 animate-slideInRight hidden lg:block"
@@ -143,6 +151,23 @@ function ChatSticky({ day, onClose, onExpand, cardRef, messages, onSendMessage }
           ))}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Quick Prompts */}
+        {!hasUserMessage && (
+          <div className="px-3 pb-2 space-y-2 flex-shrink-0">
+            <p className="text-white/40 text-xs font-sans">Ask Ryan:</p>
+            {quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => onSendMessage(prompt)}
+                className="w-full text-left px-3 py-2 rounded-lg bg-slate-700/30 text-white/70 hover:bg-slate-700 hover:text-white transition-all font-sans text-xs flex items-center gap-2 border border-white/5 hover:border-white/10"
+              >
+                <Send className="w-3 h-3" />
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Input Area */}
         <div className="p-3 border-t border-white/10 bg-slate-900/50 flex-shrink-0">
@@ -202,6 +227,14 @@ function FeedbackModal({ day, onClose, messages, onSendMessage }: FeedbackModalP
     }
   };
 
+  const hasUserMessage = messages.some(m => m.sender === 'user');
+
+  const quickPrompts = [
+    'Suggest shorter version',
+    'Too intense',
+    'Something easier',
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn">
       <div className="bg-slate-900 rounded-3xl w-full max-w-lg h-[85vh] border border-white/10 shadow-2xl flex flex-col overflow-hidden">
@@ -242,6 +275,25 @@ function FeedbackModal({ day, onClose, messages, onSendMessage }: FeedbackModalP
           ))}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Quick Prompts */}
+        {!hasUserMessage && (
+          <div className="px-6 pb-2 space-y-2 flex-shrink-0">
+            <p className="text-white/40 text-xs font-sans">Ask Ryan:</p>
+            <div className="space-y-2">
+              {quickPrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => onSendMessage(prompt)}
+                  className="w-full text-left px-4 py-3 rounded-xl bg-slate-800/50 text-white/70 hover:bg-slate-800 hover:text-white transition-all font-sans text-sm flex items-center gap-3 border border-white/5 hover:border-white/10"
+                >
+                  <Send className="w-4 h-4" />
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Input Area */}
         <div className="p-4 border-t border-white/10 bg-slate-900 flex-shrink-0">
