@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, GripVertical, Play, MessageCircle, X, AlertCircle } from 'lucide-react';
+import { ArrowLeft, GripVertical, Play, MessageCircle, X, AlertCircle, Maximize2, Send, Info } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { anonymousApi } from '../services/api';
@@ -23,6 +23,109 @@ interface DragItem {
   index: number;
   id: string;
   type: string;
+}
+
+interface ChatStickyProps {
+  day: WorkoutDay;
+  onClose: () => void;
+  onExpand: () => void;
+  cardRef: HTMLDivElement | null;
+}
+
+function ChatSticky({ day, onClose, onExpand, cardRef }: ChatStickyProps) {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (cardRef) {
+      const updatePosition = () => {
+        const rect = cardRef.getBoundingClientRect();
+        setPosition({
+          top: rect.top,
+          left: rect.right + 16
+        });
+      };
+
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [cardRef]);
+
+  const quickPrompts = [
+    'Suggest shorter version',
+    'Too intense',
+    'Something easier',
+  ];
+
+  return (
+    <div 
+      className="fixed z-40 animate-slideInRight hidden lg:block"
+      style={{
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+        maxHeight: '80vh'
+      }}
+    >
+      <div className="w-80 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl border border-orange-500/30 overflow-hidden">
+        {/* Sticky Note Header */}
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-bold shadow-lg">
+              R
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold text-sm font-sans truncate">Day {day.day} Chat</p>
+              <p className="text-white/80 text-xs font-sans truncate">{day.title}</p>
+            </div>
+            <button
+              onClick={onExpand}
+              className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            >
+              <Maximize2 className="w-4 h-4 text-white" />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        </div>
+
+        {/* Chat Content - Compact */}
+        <div className="p-4 max-h-[60vh] overflow-y-auto space-y-4">
+          {/* Ryan's greeting */}
+          <div className="flex gap-2 items-start">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+              R
+            </div>
+            <div className="bg-slate-700/50 rounded-lg rounded-tl-sm p-3 flex-1">
+              <p className="text-white text-sm font-sans">Need any adjustments? 💪</p>
+            </div>
+          </div>
+
+          {/* Quick Prompts */}
+          <div className="space-y-2">
+            <p className="text-white/40 text-xs font-sans">Ask Ryan:</p>
+            {quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                className="w-full text-left px-3 py-2 rounded-lg bg-slate-700/30 text-white/70 hover:bg-slate-700 hover:text-white transition-all font-sans text-xs flex items-center gap-2"
+              >
+                <Send className="w-3 h-3" />
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface FeedbackModalProps {
@@ -192,8 +295,24 @@ function FeedbackModal({ day, onClose }: FeedbackModalProps) {
   );
 }
 
-function WorkoutCard({ day, index, moveCard }: { day: WorkoutDay; index: number; moveCard: (dragIndex: number, hoverIndex: number) => void }) {
-  const [showFeedback, setShowFeedback] = useState(false);
+function WorkoutCard({ 
+  day, 
+  index, 
+  moveCard,
+  isActiveChatDay,
+  onChatToggle
+}: { 
+  day: WorkoutDay; 
+  index: number; 
+  moveCard: (dragIndex: number, hoverIndex: number) => void;
+  isActiveChatDay: boolean;
+  onChatToggle: (dayId: string) => void;
+}) {
+  const [showExpandedModal, setShowExpandedModal] = useState(false);
+  const [cardRef, setCardRef] = useState<HTMLDivElement | null>(null);
+  const [effort, setEffort] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
   
   const [{ isDragging }, drag] = useDrag({
     type: 'workout-card',
@@ -213,37 +332,102 @@ function WorkoutCard({ day, index, moveCard }: { day: WorkoutDay; index: number;
     },
   });
 
+  const effortIcons = {
+    'Easy': '😊',
+    'Manageable': '💪',
+    'Hard': '😅',
+    'Too Hard': '🥵',
+  };
+
+  const statusIcons = {
+    'Completed': '✅',
+    'Skipped': '⏭️',
+    'Left Midway': '⏸️',
+  };
+
+  const encouragingMessages = [
+    "Beast mode! 💪",
+    "Crushing it! 🔥",
+    "You're unstoppable! 💯",
+    "Keep grinding! ⚡",
+    "Ryan's proud! 🏆",
+  ];
+
+  const handleStatusClick = (option: 'Completed' | 'Skipped' | 'Left Midway') => {
+    setStatus(option);
+    if (option === 'Completed') {
+      setShowCelebration(true);
+      setTimeout(() => setShowCelebration(false), 2000);
+    }
+  };
+
   return (
     <>
       <div
-        ref={(node) => { drag(drop(node)); }}
-        className={`bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-white/10 hover:border-orange-500/50 transition-all cursor-move group relative ${
+        ref={(node) => {
+          drag(drop(node));
+          setCardRef(node);
+        }}
+        className={`bg-black/40 backdrop-blur-xl rounded-2xl p-4 sm:p-6 border transition-all cursor-move group relative ${
           isDragging ? 'opacity-50' : ''
+        } ${
+          isActiveChatDay 
+            ? 'border-orange-500 ring-2 ring-orange-500/30' 
+            : 'border-white/10 hover:border-orange-500/50'
+        } ${
+          status === 'Completed' ? 'bg-gradient-to-br from-green-500/10 via-black/40 to-black/40' : ''
         }`}
       >
+        {/* Celebration Effect */}
+        {showCelebration && (
+          <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center">
+            <div className="animate-ping absolute h-20 w-20 rounded-full bg-green-400 opacity-75"></div>
+            <div className="text-4xl animate-bounce">{encouragingMessages[Math.floor(Math.random() * encouragingMessages.length)]}</div>
+          </div>
+        )}
+
+        {/* Completion Streak Badge */}
+        {status === 'Completed' && (
+          <div className="absolute -top-3 -right-3 bg-gradient-to-r from-green-400 to-green-600 text-white px-3 py-1 rounded-full text-xs font-bold font-sans shadow-lg z-10 flex items-center gap-1 animate-slideInTop">
+            <span>🔥</span>
+            <span>Done!</span>
+          </div>
+        )}
+
         {/* Ryan Chat Head - Only for non-rest days */}
         {!day.isRestDay && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setShowFeedback(true);
+              onChatToggle(day.id);
             }}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold shadow-lg hover:scale-110 transition-transform z-10 cursor-pointer"
+            className={`absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all z-10 ${
+              isActiveChatDay
+                ? 'bg-gradient-to-br from-orange-600 to-red-600 scale-110 ring-4 ring-orange-500/50'
+                : 'bg-gradient-to-br from-orange-500 to-red-500 hover:scale-110'
+            }`}
             style={{ cursor: 'pointer' }}
           >
-            <MessageCircle className="w-5 h-5" />
+            {isActiveChatDay ? (
+              <div className="relative">
+                <MessageCircle className="w-5 h-5" fill="white" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
+              </div>
+            ) : (
+              <MessageCircle className="w-5 h-5" />
+            )}
           </button>
         )}
 
-        <div className="flex items-start gap-4">
-          {/* Drag Handle */}
-          <div className="pt-2 opacity-40 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          {/* Drag Handle - Hidden on mobile */}
+          <div className="hidden sm:block pt-2 opacity-40 group-hover:opacity-100 transition-opacity">
             <GripVertical className="w-5 h-5 text-white" />
           </div>
 
           {/* Thumbnail */}
           {!day.isRestDay && day.thumbnail && (
-            <div className="relative flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden bg-slate-800">
+            <div className="relative flex-shrink-0 w-full sm:w-32 h-32 sm:h-20 rounded-lg overflow-hidden bg-slate-800">
               <img
                 src={day.thumbnail}
                 alt={day.title}
@@ -251,8 +435,8 @@ function WorkoutCard({ day, index, moveCard }: { day: WorkoutDay; index: number;
               />
               {/* Play button overlay */}
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
-                  <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
+                <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
                 </div>
               </div>
             </div>
@@ -260,14 +444,14 @@ function WorkoutCard({ day, index, moveCard }: { day: WorkoutDay; index: number;
 
           {/* Rest Day Icon */}
           {day.isRestDay && (
-            <div className="flex-shrink-0 w-32 h-20 rounded-lg bg-slate-800/50 flex items-center justify-center border-2 border-dashed border-slate-700">
-              <span className="text-3xl">😴</span>
+            <div className="flex-shrink-0 w-full sm:w-32 h-32 sm:h-20 rounded-lg bg-slate-800/50 flex items-center justify-center border-2 border-dashed border-slate-700">
+              <span className="text-4xl sm:text-3xl">😴</span>
             </div>
           )}
 
           {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
+          <div className="flex-1 min-w-0 w-full">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold font-sans">
                 Day {day.day}
               </span>
@@ -277,14 +461,76 @@ function WorkoutCard({ day, index, moveCard }: { day: WorkoutDay; index: number;
                 </span>
               )}
             </div>
-            <h3 className="text-xl font-bold text-white mb-1 font-sans">{day.title}</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-white mb-1 font-sans">{day.title}</h3>
             {!day.isRestDay && (
               <>
-                <p className="text-white/70 text-sm mb-2 font-sans">{day.exercises}</p>
-                <div className="flex items-center gap-2 text-orange-400 text-sm font-sans">
+                <p className="text-white/70 text-sm mb-3 font-sans">{day.exercises}</p>
+                <div className="flex items-center gap-2 text-orange-400 text-sm font-sans mb-3">
                   <span>⏱️</span>
                   <span>{day.duration}</span>
                 </div>
+
+                {/* Quick Feedback Section - Mobile Responsive */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mt-3 pt-3 border-t border-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/60 text-xs font-sans">Completed?</span>
+                  </div>           
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Status Buttons */}
+                    {(['Completed', 'Skipped', 'Left Midway'] as const).map((option) => (
+                      <button
+                        key={option}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStatusClick(option);
+                        }}
+                        className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all ${
+                          status === option
+                            ? option === 'Completed' 
+                              ? 'bg-green-500 scale-110 shadow-lg ring-2 ring-green-400/50' 
+                              : 'bg-orange-500 scale-110 shadow-lg'
+                            : 'bg-slate-700/50 hover:bg-slate-700'
+                        }`}
+                        title={option}
+                      >
+                        <span className="text-lg sm:text-base">{statusIcons[option]}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="hidden sm:block h-4 w-px bg-white/10"></div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white/60 text-xs font-sans">Effort</span>
+                    {/* Effort Buttons */}
+                    {(['Easy', 'Manageable', 'Hard', 'Too Hard'] as const).map((option) => (
+                      <button
+                        key={option}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEffort(option);
+                        }}
+                        className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all ${
+                          effort === option
+                            ? 'bg-orange-500 scale-110 shadow-lg'
+                            : 'bg-slate-700/50 hover:bg-slate-700'
+                        }`}
+                        title={option}
+                      >
+                        <span className="text-lg sm:text-base">{effortIcons[option]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Encouraging Message for Completion */}
+                {status === 'Completed' && !showCelebration && (
+                  <div className="mt-3 bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center animate-slideInTop">
+                    <p className="text-green-400 text-sm font-semibold font-sans">
+                      🎉 Amazing work! See you tomorrow!
+                    </p>
+                  </div>
+                )}
               </>
             )}
             {day.isRestDay && (
@@ -294,11 +540,36 @@ function WorkoutCard({ day, index, moveCard }: { day: WorkoutDay; index: number;
         </div>
       </div>
 
-      {/* Feedback Modal */}
-      {showFeedback && (
+      {/* Sticky Chat Panel - Hidden on mobile, use modal instead */}
+      {isActiveChatDay && !showExpandedModal && (
+        <div className="hidden lg:block">
+          <ChatSticky 
+            day={day} 
+            onClose={() => onChatToggle(day.id)}
+            onExpand={() => setShowExpandedModal(true)}
+            cardRef={cardRef}
+          />
+        </div>
+      )}
+
+      {/* Auto-open modal on mobile when chat is active */}
+      {isActiveChatDay && !showExpandedModal && (
+        <div className="lg:hidden">
+          <FeedbackModal 
+            day={day} 
+            onClose={() => onChatToggle(day.id)} 
+          />
+        </div>
+      )}
+
+      {/* Expanded Modal */}
+      {showExpandedModal && (
         <FeedbackModal 
           day={day} 
-          onClose={() => setShowFeedback(false)} 
+          onClose={() => {
+            setShowExpandedModal(false);
+            onChatToggle(day.id);
+          }} 
         />
       )}
     </>
@@ -310,6 +581,11 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
   const [error, setError] = useState<string | null>(null);
   const [workoutDays, setWorkoutDays] = useState<WorkoutDay[]>([]);
   const fetchedGoal = useRef<string | null>(null);
+  const [activeChatDay, setActiveChatDay] = useState<string | null>(null);
+
+  const toggleChatDay = (dayId: string) => {
+    setActiveChatDay(prev => prev === dayId ? null : dayId);
+  };
 
   useEffect(() => {
     if (fetchedGoal.current === goalType) return;
@@ -511,6 +787,8 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
                   day={day}
                   index={index}
                   moveCard={moveCard}
+                  isActiveChatDay={activeChatDay === day.id}
+                  onChatToggle={toggleChatDay}
                 />
               ))}
             </div>
