@@ -25,15 +25,33 @@ interface DragItem {
   type: string;
 }
 
+interface ChatMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'ryan';
+}
+
 interface ChatStickyProps {
   day: WorkoutDay;
   onClose: () => void;
   onExpand: () => void;
   cardRef: HTMLDivElement | null;
+  messages: ChatMessage[];
+  onSendMessage: (text: string) => void;
 }
 
-function ChatSticky({ day, onClose, onExpand, cardRef }: ChatStickyProps) {
+function ChatSticky({ day, onClose, onExpand, cardRef, messages, onSendMessage }: ChatStickyProps) {
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [inputText, setInputText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   useEffect(() => {
     if (cardRef) {
@@ -56,11 +74,19 @@ function ChatSticky({ day, onClose, onExpand, cardRef }: ChatStickyProps) {
     }
   }, [cardRef]);
 
-  const quickPrompts = [
-    'Suggest shorter version',
-    'Too intense',
-    'Something easier',
-  ];
+  const handleSend = () => {
+    if (inputText.trim()) {
+      onSendMessage(inputText);
+      setInputText('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <div 
@@ -71,9 +97,9 @@ function ChatSticky({ day, onClose, onExpand, cardRef }: ChatStickyProps) {
         maxHeight: '80vh'
       }}
     >
-      <div className="w-80 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl border border-orange-500/30 overflow-hidden">
+      <div className="w-80 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl border border-orange-500/30 overflow-hidden flex flex-col h-[500px]">
         {/* Sticky Note Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4">
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-bold shadow-lg">
               R
@@ -97,30 +123,45 @@ function ChatSticky({ day, onClose, onExpand, cardRef }: ChatStickyProps) {
           </div>
         </div>
 
-        {/* Chat Content - Compact */}
-        <div className="p-4 max-h-[60vh] overflow-y-auto space-y-4">
-          {/* Ryan's greeting */}
-          <div className="flex gap-2 items-start">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-              R
+        {/* Chat Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-2 items-start ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 ${
+                msg.sender === 'ryan' ? 'bg-gradient-to-br from-orange-500 to-red-500' : 'bg-slate-600'
+              }`}>
+                {msg.sender === 'ryan' ? 'R' : 'U'}
+              </div>
+              <div className={`rounded-lg p-3 max-w-[80%] ${
+                msg.sender === 'ryan' 
+                  ? 'bg-slate-700/50 rounded-tl-sm text-white' 
+                  : 'bg-orange-500/20 text-white rounded-tr-sm'
+              }`}>
+                <p className="text-sm font-sans">{msg.text}</p>
+              </div>
             </div>
-            <div className="bg-slate-700/50 rounded-lg rounded-tl-sm p-3 flex-1">
-              <p className="text-white text-sm font-sans">Need any adjustments? 💪</p>
-            </div>
-          </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
 
-          {/* Quick Prompts */}
-          <div className="space-y-2">
-            <p className="text-white/40 text-xs font-sans">Ask Ryan:</p>
-            {quickPrompts.map((prompt) => (
-              <button
-                key={prompt}
-                className="w-full text-left px-3 py-2 rounded-lg bg-slate-700/30 text-white/70 hover:bg-slate-700 hover:text-white transition-all font-sans text-xs flex items-center gap-2"
-              >
-                <Send className="w-3 h-3" />
-                {prompt}
-              </button>
-            ))}
+        {/* Input Area */}
+        <div className="p-3 border-t border-white/10 bg-slate-900/50 flex-shrink-0">
+          <div className="relative">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Message Ryan..."
+              className="w-full bg-slate-800 text-white pl-4 pr-10 py-3 rounded-xl border border-white/10 focus:outline-none focus:border-orange-500/50 text-sm font-sans placeholder:text-white/20"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!inputText.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg bg-orange-500 text-white disabled:opacity-50 disabled:bg-slate-700 transition-all hover:bg-orange-600"
+            >
+              <Send className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -131,164 +172,96 @@ function ChatSticky({ day, onClose, onExpand, cardRef }: ChatStickyProps) {
 interface FeedbackModalProps {
   day: WorkoutDay;
   onClose: () => void;
+  messages: ChatMessage[];
+  onSendMessage: (text: string) => void;
 }
 
-function FeedbackModal({ day, onClose }: FeedbackModalProps) {
-  const [effort, setEffort] = useState<string | null>(null);
-  const [completion, setCompletion] = useState<string | null>(null);
-  const [bodyFeel, setBodyFeel] = useState<string | null>(null);
+function FeedbackModal({ day, onClose, messages, onSendMessage }: FeedbackModalProps) {
+  const [inputText, setInputText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const effortOptions = ['Easy', 'Manageable', 'Hard', 'Too Hard'];
-  const completionOptions = ['Completed', 'Skipped', 'Left Midway'];
-  const bodyFeelOptions = ['Fresh', 'Neutral', 'Sore', 'Pain'];
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
-  const quickPrompts = [
-    '💬 "Can you suggest a shorter version?"',
-    '💬 "This was too intense for me"',
-    '💬 "Give me something similar but easier"',
-  ];
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSend = () => {
+    if (inputText.trim()) {
+      onSendMessage(inputText);
+      setInputText('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-slate-900 rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto border border-white/10 shadow-2xl">
+      <div className="bg-slate-900 rounded-3xl w-full max-w-lg h-[85vh] border border-white/10 shadow-2xl flex flex-col overflow-hidden">
         {/* Header with Coach Avatar */}
-        <div className="sticky top-0 bg-slate-900 border-b border-white/10 p-6 flex items-center gap-4 z-10">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-6 flex items-center gap-4 z-10 flex-shrink-0">
+          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-bold text-xl shadow-lg">
             R
           </div>
-          <div className="flex-1">
-            <h3 className="text-white font-bold font-sans">Ryan</h3>
-            <p className="text-white/60 text-sm font-sans">Your AI Coach</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-bold font-sans text-lg">Day {day.day} Chat</h3>
+            <p className="text-white/90 text-sm font-sans truncate">{day.title}</p>
           </div>
           <button 
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
           >
-            <X className="w-4 h-4 text-white" />
+            <X className="w-5 h-5 text-white" />
           </button>
         </div>
 
         {/* Chat Content */}
-        <div className="p-6 space-y-6">
-          {/* Coach Message */}
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              R
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
+                msg.sender === 'ryan' ? 'bg-gradient-to-br from-orange-500 to-red-500' : 'bg-slate-600'
+              }`}>
+                {msg.sender === 'ryan' ? 'R' : 'U'}
+              </div>
+              <div className={`rounded-2xl p-4 max-w-[80%] ${
+                msg.sender === 'ryan' 
+                  ? 'bg-slate-800 rounded-tl-sm text-white' 
+                  : 'bg-orange-500/20 text-white rounded-tr-sm'
+              }`}>
+                <p className="font-sans text-sm sm:text-base leading-relaxed">{msg.text}</p>
+              </div>
             </div>
-            <div className="bg-slate-800 rounded-2xl rounded-tl-sm p-4 flex-1">
-              <p className="text-white font-sans">
-                Hey! How did <span className="font-bold text-orange-400">{day.title}</span> go for you today? 💪
-              </p>
-            </div>
-          </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
 
-          {/* Effort Question */}
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                R
-              </div>
-              <div className="bg-slate-800 rounded-2xl rounded-tl-sm p-4 flex-1">
-                <p className="text-white/90 font-sans text-sm">How was the effort level?</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 ml-11">
-              {effortOptions.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setEffort(option)}
-                  className={`py-3 px-4 rounded-xl font-sans text-sm font-medium transition-all ${
-                    effort === option
-                      ? 'bg-orange-500 text-white shadow-lg'
-                      : 'bg-slate-800 text-white/80 hover:bg-slate-700'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
+        {/* Input Area */}
+        <div className="p-4 border-t border-white/10 bg-slate-900 flex-shrink-0">
+          <div className="relative flex items-center gap-2">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Message Ryan..."
+              className="flex-1 bg-slate-800 text-white pl-4 pr-12 py-4 rounded-xl border border-white/10 focus:outline-none focus:border-orange-500/50 text-base font-sans placeholder:text-white/20"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!inputText.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-lg bg-orange-500 text-white disabled:opacity-50 disabled:bg-slate-700 transition-all hover:bg-orange-600 shadow-lg"
+            >
+              <Send className="w-5 h-5" />
+            </button>
           </div>
-
-          {/* Completion Question */}
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                R
-              </div>
-              <div className="bg-slate-800 rounded-2xl rounded-tl-sm p-4 flex-1">
-                <p className="text-white/90 font-sans text-sm">Did you complete it?</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 ml-11">
-              {completionOptions.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setCompletion(option)}
-                  className={`py-3 px-4 rounded-xl font-sans text-sm font-medium transition-all ${
-                    completion === option
-                      ? 'bg-orange-500 text-white shadow-lg'
-                      : 'bg-slate-800 text-white/80 hover:bg-slate-700'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Body Feel Question */}
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                R
-              </div>
-              <div className="bg-slate-800 rounded-2xl rounded-tl-sm p-4 flex-1">
-                <p className="text-white/90 font-sans text-sm">How does your body feel?</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 ml-11">
-              {bodyFeelOptions.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setBodyFeel(option)}
-                  className={`py-3 px-4 rounded-xl font-sans text-sm font-medium transition-all ${
-                    bodyFeel === option
-                      ? 'bg-orange-500 text-white shadow-lg'
-                      : 'bg-slate-800 text-white/80 hover:bg-slate-700'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Prompts */}
-          <div className="space-y-2 pt-4 border-t border-white/10">
-            <p className="text-white/60 text-xs font-sans ml-11">Or tell me what you need:</p>
-            <div className="space-y-2 ml-11">
-              {quickPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  className="w-full text-left py-3 px-4 rounded-xl bg-slate-800/50 text-white/70 hover:bg-slate-800 hover:text-white transition-all font-sans text-sm"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          {(effort || completion || bodyFeel) && (
-            <div className="pt-2">
-              <button 
-                onClick={onClose}
-                className="w-full bg-orange-500 text-white py-4 rounded-full font-bold font-sans hover:bg-orange-600 transition-colors"
-              >
-                Submit Feedback
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -312,6 +285,18 @@ function WorkoutCard({
   const [cardRef, setCardRef] = useState<HTMLDivElement | null>(null);
   const [effort, setEffort] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: '1', text: 'Need any adjustments? 💪', sender: 'ryan' }
+  ]);
+  
+  const handleSendMessage = (text: string) => {
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text,
+      sender: 'user'
+    };
+    setMessages(prev => [...prev, newMessage]);
+  };
   
   const [{ isDragging }, drag] = useDrag({
     type: 'workout-card',
@@ -520,6 +505,8 @@ function WorkoutCard({
             onClose={() => onChatToggle(day.id)}
             onExpand={() => setShowExpandedModal(true)}
             cardRef={cardRef}
+            messages={messages}
+            onSendMessage={handleSendMessage}
           />
         </div>
       )}
@@ -530,6 +517,8 @@ function WorkoutCard({
           <FeedbackModal 
             day={day} 
             onClose={() => onChatToggle(day.id)} 
+            messages={messages}
+            onSendMessage={handleSendMessage}
           />
         </div>
       )}
@@ -542,6 +531,8 @@ function WorkoutCard({
             setShowExpandedModal(false);
             onChatToggle(day.id);
           }} 
+          messages={messages}
+          onSendMessage={handleSendMessage}
         />
       )}
     </>
