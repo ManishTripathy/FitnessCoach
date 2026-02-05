@@ -312,7 +312,6 @@ function WorkoutCard({
   const [cardRef, setCardRef] = useState<HTMLDivElement | null>(null);
   const [effort, setEffort] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [showCelebration, setShowCelebration] = useState(false);
   
   const [{ isDragging }, drag] = useDrag({
     type: 'workout-card',
@@ -344,21 +343,9 @@ function WorkoutCard({
     'Skipped': '⏭️',
     'Left Midway': '⏸️',
   };
-
-  const encouragingMessages = [
-    "Beast mode! 💪",
-    "Crushing it! 🔥",
-    "You're unstoppable! 💯",
-    "Keep grinding! ⚡",
-    "Ryan's proud! 🏆",
-  ];
-
+ 
   const handleStatusClick = (option: 'Completed' | 'Skipped' | 'Left Midway') => {
-    setStatus(option);
-    if (option === 'Completed') {
-      setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 2000);
-    }
+    setStatus(prev => (prev === option ? null : option));
   };
 
   return (
@@ -378,14 +365,6 @@ function WorkoutCard({
           status === 'Completed' ? 'bg-gradient-to-br from-green-500/10 via-black/40 to-black/40' : ''
         }`}
       >
-        {/* Celebration Effect */}
-        {showCelebration && (
-          <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center">
-            <div className="animate-ping absolute h-20 w-20 rounded-full bg-green-400 opacity-75"></div>
-            <div className="text-4xl animate-bounce">{encouragingMessages[Math.floor(Math.random() * encouragingMessages.length)]}</div>
-          </div>
-        )}
-
         {/* Completion Streak Badge */}
         {status === 'Completed' && (
           <div className="absolute -top-3 -right-3 bg-gradient-to-r from-green-400 to-green-600 text-white px-3 py-1 rounded-full text-xs font-bold font-sans shadow-lg z-10 flex items-center gap-1 animate-slideInTop">
@@ -524,13 +503,6 @@ function WorkoutCard({
                 </div>
 
                 {/* Encouraging Message for Completion */}
-                {status === 'Completed' && !showCelebration && (
-                  <div className="mt-3 bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center animate-slideInTop">
-                    <p className="text-green-400 text-sm font-semibold font-sans">
-                      🎉 Amazing work! See you tomorrow!
-                    </p>
-                  </div>
-                )}
               </>
             )}
             {day.isRestDay && (
