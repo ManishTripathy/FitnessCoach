@@ -43,7 +43,7 @@ async def check_ai_connection():
         )
         
         # Create session explicitly
-        session_service.create_session_sync(
+        await session_service.create_session(
             app_name="fitness_coach_app",
             user_id="test",
             session_id="test"
@@ -92,7 +92,7 @@ async def _run_agent(runner: Runner, parts: list) -> types.Content:
     # Ensure session exists on the runner's service
     # Since create_session_sync is synchronous, we can keep using it or switch to async if available.
     # But InMemorySessionService operations are typically fast/sync safe.
-    runner.session_service.create_session_sync(
+    await runner.session_service.create_session(
         app_name="fitness_coach_app",
         user_id=uid,
         session_id=sid
