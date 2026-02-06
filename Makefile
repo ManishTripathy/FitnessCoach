@@ -1,4 +1,8 @@
-.PHONY: setup backend frontend dev
+.PHONY: setup backend frontend dev seed-data
+
+# Default values for seeding
+TRAINERS ?= "Caroline Girvan" "Sydney Cummings"
+LIMIT ?= 5
 
 setup:
 	@echo "Setting up backend..."
@@ -19,3 +23,7 @@ dev:
 	@echo "Starting both backend and frontend..."
 	@echo "Use 'make -j2 backend frontend' to run in parallel, or run in separate terminals."
 	$(MAKE) -j2 backend frontend
+
+seed-data:
+	@echo "Seeding data for trainers: $(TRAINERS)"
+	. backend/venv/bin/activate && python backend/scripts/seed_workouts_v2.py --trainers $(TRAINERS) --limit $(LIMIT)

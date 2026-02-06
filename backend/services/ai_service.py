@@ -297,7 +297,7 @@ def generate_text_embedding(text: str) -> list:
     try:
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         response = client.models.embed_content(
-            model="text-embedding-004",
+            model="models/gemini-embedding-001",
             contents=text
         )
         return response.embeddings[0].values
