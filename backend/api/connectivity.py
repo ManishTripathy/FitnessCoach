@@ -14,11 +14,11 @@ async def firebase_connectivity():
 
 @router.get("/connectivity/ai")
 async def ai_connectivity():
-    return check_ai_connection()
+    return await check_ai_connection()
 
 @router.get("/connectivity/all")
 async def all_connectivity():
     return {
         "firebase": check_firebase_connection(),
-        "ai": check_ai_connection()
+        "ai": await check_ai_connection()
     }

@@ -76,7 +76,7 @@ async def generate_plan(
             raise HTTPException(status_code=500, detail="Workout library is empty. Please seed data.")
 
         # 3. Generate Plan via AI
-        ai_result = generate_weekly_plan_rag(user_goal, workout_library)
+        ai_result = await generate_weekly_plan_rag(user_goal, workout_library)
         
         # 4. Enrich plan with full workout details (thumbnails, urls)
         enriched_schedule = []

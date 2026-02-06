@@ -75,7 +75,7 @@ async def analyze_anonymous(request: AnalyzeRequest):
     # Download and Analyze
     try:
         image_bytes = download_file_as_bytes(session["storage_path"])
-        analysis = analyze_body_image(image_bytes)
+        analysis = await analyze_body_image(image_bytes)
         
         # Save results
         save_anonymous_session(request.session_id, {"analysis_results": analysis})
@@ -124,7 +124,7 @@ async def generate_anonymous_physique(request: GenerateRequest):
         image_bytes = download_file_as_bytes(session["storage_path"])
         
         # Generate
-        generated_bytes = generate_future_physique(image_bytes, request.goal)
+        generated_bytes = await generate_future_physique(image_bytes, request.goal)
         
         # Upload generated image
         bucket = get_bucket()
@@ -199,9 +199,8 @@ async def suggest_anonymous_path(request: AnalyzeRequest):
         original_bytes, lean_bytes, athletic_bytes, muscle_bytes = results
         
         # Call AI Service
-        recommendation = await loop.run_in_executor(
-            None, 
-            recommend_fitness_path,
+        # Now recommend_fitness_path is async, so we await it directly
+        recommendation = await recommend_fitness_path(
             original_bytes, lean_bytes, athletic_bytes, muscle_bytes
         )
         
@@ -240,7 +239,7 @@ async def generate_anonymous_plan(request: PlanRequest):
             raise HTTPException(status_code=500, detail="Workout library is empty.")
 
         # 2. Generate Plan via AI
-        ai_result = generate_weekly_plan_rag(request.goal, workout_library)
+        ai_result = await generate_weekly_plan_rag(request.goal, workout_library)
         
         # 3. Enrich plan
         enriched_schedule = []

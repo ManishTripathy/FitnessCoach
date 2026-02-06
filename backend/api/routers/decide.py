@@ -113,9 +113,8 @@ async def suggest_path(token: dict = Depends(verify_firebase_token)):
         original_bytes, lean_bytes, athletic_bytes, muscle_bytes = results
         
         # 3. Call AI Service
-        recommendation = await loop.run_in_executor(
-            None, 
-            recommend_fitness_path,
+        # recommend_fitness_path is now async
+        recommendation = await recommend_fitness_path(
             original_bytes, lean_bytes, athletic_bytes, muscle_bytes
         )
         

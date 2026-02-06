@@ -28,7 +28,7 @@ async def analyze_body(request: AnalyzeRequest, token=Depends(verify_firebase_to
         image_bytes = download_file_as_bytes(request.storage_path)
         
         # 2. Analyze
-        analysis = analyze_body_image(image_bytes)
+        analysis = await analyze_body_image(image_bytes)
         
         return analysis
     except Exception as e:
@@ -65,7 +65,7 @@ async def generate_physique(request: GenerateRequest, token=Depends(verify_fireb
         print("Image downloaded successfully")
         
         # 2. Generate
-        generated_bytes = generate_future_physique(image_bytes, request.goal)
+        generated_bytes = await generate_future_physique(image_bytes, request.goal)
         print("Image generated successfully")
         
         # 3. Upload generated image
