@@ -1,8 +1,9 @@
-.PHONY: setup backend frontend dev seed-data
+.PHONY: setup backend frontend dev seed-data seed-data-agent
 
 # Default values for seeding
 TRAINERS ?= "Caroline Girvan" "Sydney Cummings"
 LIMIT ?= 5
+VIDEOS_PER_PLAYLIST ?= 3
 
 setup:
 	@echo "Setting up backend..."
@@ -27,3 +28,11 @@ dev:
 seed-data:
 	@echo "Seeding data for trainers: $(TRAINERS)"
 	. backend/venv/bin/activate && python backend/scripts/seed_workouts_v2.py --trainers $(TRAINERS) --limit $(LIMIT)
+
+seed-data-agent:
+	@echo "Seeding data using ADK Agent curation for: $(TRAINERS)"
+	. backend/venv/bin/activate && python backend/scripts/seed_workouts_v3.py --trainers $(TRAINERS) --videos_per_playlist $(VIDEOS_PER_PLAYLIST)
+
+reset-db:
+	@echo "Resetting workout_library collection..."
+	. backend/venv/bin/activate && python backend/scripts/reset_db.py
