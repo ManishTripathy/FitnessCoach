@@ -45,6 +45,13 @@ from google.adk.models import Gemini
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+# Opik Integration
+import opik
+from opik.integrations.adk import OpikTracer, track_adk_agent_recursive
+
+# Configure Opik (assumes OPIK_API_KEY is set in environment or local setup)
+opik.configure(use_local=False)
+
 # --- Tools ---
 
 def search_youtube_playlists(trainer_name: str) -> List[Dict[str, Any]]:
@@ -102,13 +109,32 @@ async def get_curated_playlists(trainer_name: str) -> List[Dict[str, Any]]:
     - "reason": Why you approved it (e.g., "Structured workout program")
     """
     
+    # model = "gemini-2.0-flash"
     model = Gemini(model="gemini-2.0-flash", tools=tools)
     
     agent = Agent(
         name="playlist_curator",
         model=model,
-        instruction=system_instruction
+        description="Agent as Fitness Content Curator",
+        instruction=system_instruction,
+        # tools=tools
     )
+    
+    # Configure Opik tracer
+    opik_tracer = OpikTracer(
+        name="playlist-curator-agent",
+        tags=["seed-script", "curation"],
+        metadata={
+            "environment": "development",
+            "model": "gemini-2.0-flash",
+            "framework": "google-adk",
+            "example": "basic"
+        },
+        project_name="fitness_coach"
+    )
+    
+    # Recursively track the agent
+    track_adk_agent_recursive(agent, opik_tracer)
     
     # 3. Define the Runner
     runner = Runner(
