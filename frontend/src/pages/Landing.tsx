@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Header } from '../components/Header';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
@@ -56,30 +57,7 @@ const Landing: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/30 via-red-500/20 to-purple-600/30 pointer-events-none"></div>
 
       {/* Header */}
-      <header className="relative w-full bg-black/50 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="text-white">
-            <span className="text-orange-500">Ryan</span> Coach
-          </div>
-          <div className="flex items-center gap-6">
-            <button className="text-white/80 hover:text-white transition-colors">
-              Help
-            </button>
-            <button 
-                className="text-white/80 hover:text-white transition-colors"
-                onClick={() => navigate('/login')}
-            >
-              Log in
-            </button>
-            <button 
-                className="bg-orange-500 text-white px-5 py-2 rounded-full hover:bg-orange-600 transition-colors"
-                onClick={() => navigate('/register')}
-            >
-              Sign up
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header variant="transparent" />
 
       {/* Main Content */}
       <main className="relative max-w-7xl mx-auto px-6 py-12 lg:py-20">

@@ -11,7 +11,7 @@ import { anonymousApi } from '../services/api';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  sessionId: string;
+  sessionId?: string;
 }
 
 export function AuthModal({ isOpen, onClose, sessionId }: AuthModalProps) {
@@ -39,8 +39,10 @@ export function AuthModal({ isOpen, onClose, sessionId }: AuthModalProps) {
 
       const token = await userCredential.user.getIdToken();
       
-      // Migrate anonymous data
-      await anonymousApi.migrateData(sessionId, token);
+      // Migrate anonymous data if sessionId exists
+      if (sessionId) {
+        await anonymousApi.migrateData(sessionId, token);
+      }
       
       // Clear anonymous session
       // Do NOT remove session ID yet if we want to show the results on the same page
@@ -67,8 +69,8 @@ export function AuthModal({ isOpen, onClose, sessionId }: AuthModalProps) {
             </CardTitle>
             <CardDescription className="text-center text-slate-400">
               {isLogin 
-                ? 'Sign in to save your analysis results' 
-                : 'Sign up to save your analysis results'}
+                ? 'Log in to continue your fitness journey with Ryan' 
+                : 'Join Ryan to unlock your personalized fitness plan'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -104,7 +106,11 @@ export function AuthModal({ isOpen, onClose, sessionId }: AuthModalProps) {
                 className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                 disabled={loading}
               >
-                {loading ? 'Processing...' : (isLogin ? 'Sign In & Save' : 'Sign Up & Save')}
+                {loading ? 'Processing...' : (
+                  sessionId 
+                    ? (isLogin ? 'Sign In & Save' : 'Sign Up & Save')
+                    : (isLogin ? 'Sign In' : 'Sign Up')
+                )}
               </Button>
               
               <div className="text-center text-sm text-slate-400 mt-4">

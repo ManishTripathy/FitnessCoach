@@ -9,6 +9,8 @@ interface PhotoUploadProps {
   onBack: () => void;
 }
 
+import { Header } from './Header';
+
 export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -361,21 +363,7 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/30 via-red-500/20 to-purple-600/30 pointer-events-none"></div>
 
       {/* Header */}
-      <header className="relative w-full bg-black/50 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button 
-            onClick={onBack}
-            className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back
-          </button>
-          <div className="text-white">
-            <span className="text-orange-500">Ryan</span> Coach
-          </div>
-          <div className="w-20"></div>
-        </div>
-      </header>
+      <Header variant="transparent" showBack={true} onBack={onBack} />
 
       {/* Main Content */}
       <main className="relative max-w-6xl mx-auto px-6 py-12">

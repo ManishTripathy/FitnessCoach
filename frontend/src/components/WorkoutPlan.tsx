@@ -3,6 +3,7 @@ import { ArrowLeft, GripVertical, Play, MessageCircle, X, AlertCircle, Maximize2
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { anonymousApi } from '../services/api';
+import { Header } from './Header';
 
 interface WorkoutPlanProps {
   onBack: () => void;
@@ -736,21 +737,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
       <div className="absolute inset-0 bg-gradient-to-br from-orange-500/30 via-red-500/20 to-purple-600/30 pointer-events-none"></div>
 
       {/* Header */}
-      <header className="relative w-full bg-black/50 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button 
-            onClick={onBack}
-            className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back
-          </button>
-          <div className="text-white">
-            <span className="text-orange-500">Ryan</span> Coach
-          </div>
-          <div className="w-20"></div>
-        </div>
-      </header>
+      <Header variant="transparent" showBack={true} onBack={onBack} />
 
       {/* Main Content */}
       <main className="relative max-w-4xl mx-auto px-6 py-12">
