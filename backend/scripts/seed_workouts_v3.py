@@ -226,11 +226,75 @@ async def enrich_workout_metadata(title: str, description: str, duration_str: st
     Uses Gemini to infer difficulty, equipment, and a clean display title.
     """
     prompt = f"""
-    You are a fitness data classifier. Analyze the following workout video metadata and extract/infer the structured data below.
+    You are a fitness data classifier. Your task is to analyze workout video metadata and infer structured, frontend-ready fields.
 
-    Video Title: {title}
-    Description: {description[:500]}
-    Duration: {duration_str}
+    Classify the workout using ONLY the provided information. Do NOT add creativity, opinions, or assumptions beyond the metadata.
+
+    INPUT:
+    - Video Title: {title}
+    - Description: {description[:500]}
+    - Duration (ISO 8601): {duration_str}
+
+    INSTRUCTIONS:
+
+    1. display_title
+        - Create a clean, short title (5-7 words).
+        - Do NOT copy the YouTube title verbatim.
+        - Remove:
+            - Trainer names
+            - Emojis
+            - Marketing language (e.g., "Brutal", "No Repeat", "Insane")
+            - Episode numbers
+        - Keep:
+            - Approximate duration in minutes
+            - Workout type or style (e.g., HIIT, Strength, Cardio)
+            - Primary focus if clear (e.g., Full Body, Legs, Core)
+
+        Examples:
+        - "20 Min HIIT Full Body"
+        - "30 Min Dumbbell Legs"
+        - "15 Min Low Impact Core"
+
+
+    2. difficulty_score
+        - Integer between 0 and 10.
+        - Infer based on:
+            - Duration (longer = harder)
+            - Intensity indicators (e.g., HIIT, Tabata, AMRAP)
+            - Impact level (jumping/plyometrics increase difficulty)
+            - Pace and rest structure (minimal rest increases difficulty)
+            - External load or resistance
+        - Do NOT use trainer reputation or program/series names.
+
+    3. difficulty
+        - Must strictly match difficulty_score:
+        - 0-2 → "Beginner"
+        - 3-6 → "Intermediate"
+        - 7-10 → "Advanced"
+
+    
+    4. difficulty_reason
+        - Array of 2-4 short, concrete reasons.
+        - Each reason must reference a specific signal used in scoring.
+        - Allowed reason types:
+          - Duration-based (e.g., "45+ minute duration")
+          - Intensity-based (e.g., "HIIT intervals")
+          - Impact-based (e.g., "High impact jumps", "Plyometrics", "Intense trisets", "Slow movements", "Short rest periods")
+          - Load-based (e.g., "Weighted exercises", "Body weight only")
+          - Equipment-based (e.g., "Dumbbells", "Kettlebell", "Barbell")
+        - Avoid vague phrases like "challenging workout" or "high intensity".
+
+    5. equipments
+        - Array of required equipment.
+        - Normalize names (Title Case, singular or common plural).
+        - Examples:
+            - "Dumbbells"
+            - "Kettlebell"
+            - "Barbell"
+            - "Resistance Bands"
+            - "Yoga Mat"
+        - If bodyweight-only, return an empty array [].
+        - Do NOT include "None" as a value.
 
     **Requirements**:
     1. display_title: Clean, short (5-7 words) title. Remove trainer name, emojis, marketing fluff (e.g. "Brutal", "No Repeat"). Keep workout type/focus (e.g. "20 Min HIIT Full Body").
@@ -238,6 +302,11 @@ async def enrich_workout_metadata(title: str, description: str, duration_str: st
     3. difficulty: "Beginner" (0-2), "Intermediate" (3-6), or "Advanced" (7-10).
     4. difficulty_reason: Array of 2-4 short strings explaining the score (e.g. "High impact jumps", "Long duration").
     5. equipments: Array of strings (e.g. "Dumbbells", "Kettlebell", "None"). Use "None" if bodyweight only.
+
+    OUTPUT RULES:
+    - Return ONLY valid JSON.
+    - Do NOT include markdown, comments, or extra text.
+    - Ensure all fields are present and correctly typed
 
     **Output JSON**:
     {{
@@ -326,8 +395,6 @@ async def process_playlist(db, playlist_info, trainer_name, limit_per_playlist=5
                 duration_mins = parse_iso_duration(duration_str)
                 
                 focus = infer_focus(title)
-                # Add playlist tag
-                focus.append(f"Program: {playlist_title}")
                 
                 # Enrich Metadata (LLM Call)
                 print(f"     > Enriching metadata for: {title[:30]}...")
