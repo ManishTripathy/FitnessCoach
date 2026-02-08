@@ -10,7 +10,13 @@ async def generate_weekly_plan_rag(user_goal: str, available_workouts: list) -> 
     # Simplify workout list for the prompt to save tokens
     workouts_context = []
     for w in available_workouts:
-        workouts_context.append(f"ID: {w['id']} | Title: {w['title']} | Focus: {', '.join(w.get('focus', []))} | Difficulty: {w.get('difficulty', 'N/A')}")
+        title = w.get('display_title', w.get('title', 'Unknown'))
+        diff_score = w.get('difficulty_score', '')
+        diff_str = f"{w.get('difficulty', 'N/A')}"
+        if diff_score:
+            diff_str += f" ({diff_score}/10)"
+            
+        workouts_context.append(f"ID: {w['id']} | Title: {title} | Focus: {', '.join(w.get('focus', []))} | Difficulty: {diff_str}")
     
     workouts_str = "\n".join(workouts_context)
     

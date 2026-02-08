@@ -261,7 +261,9 @@ async def generate_anonymous_plan(request: PlanRequest):
             if not day.get("is_rest") and day.get("workout_id"):
                 w_id = day["workout_id"]
                 if w_id in workout_map:
-                    day["workout_details"] = workout_map[w_id]
+                    details = workout_map[w_id]
+                    day["workout_details"] = details
+                    day["activity"] = details["display_title"]
             enriched_schedule.append(day)
             
         ai_result["schedule"] = enriched_schedule
