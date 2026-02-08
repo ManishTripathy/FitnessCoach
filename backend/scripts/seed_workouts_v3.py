@@ -24,6 +24,7 @@ from google.adk.agents.llm_agent import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+from google.cloud.firestore_v1.vector import Vector
 
 # Opik Integration
 import opik
@@ -432,7 +433,8 @@ async def process_playlist(db, playlist_info, trainer_name, limit_per_playlist=5
                     """
                 embedding = generate_text_embedding(text_to_embed)
                 if embedding:
-                    workout['embedding'] = embedding
+                    # Store as Vector for Firestore Vector Search
+                    workout['embedding'] = Vector(embedding)
                     collection_ref.document(doc_id).set(workout)
                     print(f"     + Saved: {title[:30]}...")
                     count += 1

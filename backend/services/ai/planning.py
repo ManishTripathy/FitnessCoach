@@ -36,11 +36,14 @@ def search_workouts_tool(query: str) -> str:
     Returns:
         JSON string list of matching workouts with details (id, title, focus, difficulty).
     """
+    import sys
+    print(f"[Tool] Searching workouts for: '{query}'", file=sys.stderr)
     print(f"[Tool] Searching workouts for: '{query}'")
     
     db = get_db()
     if not db:
-        return json.dumps({"error": "Database not connected"})
+        print("[Tool] Database connection failed.")
+        return json.dumps([{"id": "fallback_db_error", "title": "Rest or Stretch (System Error)", "focus": ["Recovery"], "difficulty": "Beginner"}])
     
     text_to_embed = f"{query}"
     # Remove focus parameter logic
@@ -48,7 +51,8 @@ def search_workouts_tool(query: str) -> str:
     query_embedding = generate_text_embedding(text_to_embed)
     
     if not query_embedding:
-        return json.dumps({"error": "Failed to generate embedding"})
+        print("[Tool] Embedding generation failed.")
+        return json.dumps([{"id": "fallback_embedding_error", "title": "Rest or Stretch (AI Error)", "focus": ["Recovery"], "difficulty": "Beginner"}])
         
     try:
         collection = db.collection('workout_library')
@@ -58,6 +62,7 @@ def search_workouts_tool(query: str) -> str:
         from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
         
         # We assume the 'embedding' field exists and is indexed
+        print(f"[Tool] Executing vector query with dim={len(query_embedding)}...")
         vector_query = collection.find_nearest(
             vector_field="embedding",
             query_vector=Vector(query_embedding),
@@ -66,6 +71,7 @@ def search_workouts_tool(query: str) -> str:
         )
         
         results = vector_query.get()
+        print(f"[Tool] Vector query returned {len(results)} results.")
         
         workouts = []
         for doc in results:
@@ -92,11 +98,14 @@ def search_workouts_tool(query: str) -> str:
         if not workouts:
              return json.dumps([{"id": "fallback", "title": "Rest or Stretch", "focus": ["Recovery"], "difficulty": "Beginner"}])
 
+        print(f"[Tool] Found {len(workouts)} workouts for query: '{query}'")
+        print(f"[Tool] Workouts: {workouts}")
+
         return json.dumps(workouts)
         
     except Exception as e:
         print(f"[Tool] Vector search failed: {e}")
-        return json.dumps({"error": str(e)})
+        return json.dumps([{"id": "fallback_exception", "title": "Rest or Stretch (Search Error)", "focus": ["Recovery"], "difficulty": "Beginner"}])
 
 # --- Agents ---
 
@@ -131,10 +140,10 @@ skeleton_agent = Agent(
     }
     """,
     output_key="skeleton",
-    before_agent_callback=opik_tracer.before_agent_callback,
-    after_agent_callback=opik_tracer.after_agent_callback,
-    before_model_callback=opik_tracer.before_model_callback,
-    after_model_callback=opik_tracer.after_model_callback
+    # before_agent_callback=opik_tracer.before_agent_callback,
+    # after_agent_callback=opik_tracer.after_agent_callback,
+    # before_model_callback=opik_tracer.before_model_callback,
+    # after_model_callback=opik_tracer.after_model_callback
 )
 
 # 2. Retrieval Specialist
@@ -145,32 +154,36 @@ retrieval_agent = Agent(
     You are a Workout Retrieval Specialist.
     You will receive a Weekly Skeleton (check session state 'skeleton').
     
+    CRITICAL INSTRUCTION: You DO NOT have internal knowledge of specific workouts. You MUST use the `search_workouts_tool` to find them.
+    
     Your task:
-    1. Parse the skeleton.
+    1. Parse the skeleton from session state 'skeleton'.
     2. For EACH day in the skeleton that is NOT a Rest day:
        - Formulate a detailed search query including activity and focus (e.g. "High intensity leg workout for mass").
        - Call the `search_workouts_tool` with this `query`.
        - From the results, Select the BEST single workout that fits the flow.
        - You MUST use the actual 'id' returned by the tool. DO NOT invent IDs.
+       - If the tool returns a fallback workout (id starts with 'fallback'), use it or mark the day as Rest.
+       - You MUST include the 'url' and 'thumbnail' fields in the selected_workout object exactly as returned by the tool.
     3. For Rest days, explicitly set activity to "Rest" or "Active Recovery".
     
     Output Format:
     Return a JSON object with the selected workouts:
     {
        "schedule": [
-          {"day": 1, "focus": "...", "selected_workout": { ... workout details ... } or null},
+          {"day": 1, "focus": "...", "selected_workout": { "id": "...", "title": "...", "url": "...", "thumbnail": "...", ... } or null},
           ...
        ]
     }
     """,
     tools=[search_workouts_tool],
     output_key="retrieved_plan",
-    before_agent_callback=opik_tracer.before_agent_callback,
-    after_agent_callback=opik_tracer.after_agent_callback,
-    before_model_callback=opik_tracer.before_model_callback,
-    after_model_callback=opik_tracer.after_model_callback,
-    before_tool_callback=opik_tracer.before_tool_callback,
-    after_tool_callback=opik_tracer.after_tool_callback
+    # before_agent_callback=opik_tracer.before_agent_callback,
+    # after_agent_callback=opik_tracer.after_agent_callback,
+    # before_model_callback=opik_tracer.before_model_callback,
+    # after_model_callback=opik_tracer.after_model_callback,
+    # before_tool_callback=opik_tracer.before_tool_callback,
+    # after_tool_callback=opik_tracer.after_tool_callback
 )
 
 # 3. Plan Assembler
@@ -179,12 +192,14 @@ assembler_agent = Agent(
     model="gemini-2.0-flash",
     instruction="""
     You are the Final Plan Assembler.
-    You receive a schedule with selected workouts (check session state 'retrieved_plan').
+    You will receive a schedule with selected workouts in the prompt below.
     
     Your task:
     1. Review the plan for coherence.
     2. Add a "notes" field to each day explaining WHY this workout fits the flow.
     3. Ensure the format matches the strict frontend requirement.
+    4. CRITICAL: For each day with a workout, you MUST preserve the 'workout_id' from the `retrieved_plan` exactly. Do not change it.
+    5. CRITICAL: Do NOT write any code (Python, etc.). Output ONLY valid JSON.
     
     Frontend Output Format (Strict JSON):
     {
@@ -203,10 +218,10 @@ assembler_agent = Agent(
     }
     """,
     output_key="final_plan",
-    before_agent_callback=opik_tracer.before_agent_callback,
-    after_agent_callback=opik_tracer.after_agent_callback,
-    before_model_callback=opik_tracer.before_model_callback,
-    after_model_callback=opik_tracer.after_model_callback
+    # before_agent_callback=opik_tracer.before_agent_callback,
+    # after_agent_callback=opik_tracer.after_agent_callback,
+    # before_model_callback=opik_tracer.before_model_callback,
+    # after_model_callback=opik_tracer.after_model_callback
 )
 
 # Pipeline
@@ -217,149 +232,235 @@ planning_pipeline = SequentialAgent(
 )
 
 # Track the pipeline
-track_adk_agent_recursive(planning_pipeline, opik_tracer)
+opik_tracer_pipeline = OpikTracer(
+    name="fitness-planner-pipeline",
+    tags=["planning", "rag", "multi-agent"],
+    project_name="fitness_coach"
+)
+track_adk_agent_recursive(planning_pipeline, opik_tracer_pipeline)
 
+# opik_tracer_skeleton_agent = OpikTracer(
+#     name="skeleton-agent",
+#     tags=["planning", "rag", "multi-agent"],
+#     project_name="fitness_coach"
+# )
+# track_adk_agent_recursive(skeleton_agent, opik_tracer_skeleton_agent)
+
+# opik_tracer_retrieval_agent = OpikTracer(
+#     name="retrieval-agent",
+#     tags=["planning", "rag", "multi-agent"],
+#     project_name="fitness_coach"
+# )
+# track_adk_agent_recursive(retrieval_agent, opik_tracer_retrieval_agent)
+
+# opik_tracer_assembler_agent = OpikTracer(
+#     name="assembler-agent",
+#     tags=["planning", "rag", "multi-agent"],
+#     project_name="fitness_coach"
+# )
+# track_adk_agent_recursive(assembler_agent, opik_tracer_assembler_agent)
+
+
+
+async def _run_agent_with_retry(runner, user_id, session_id, message, max_retries=3):
+    """Runs an agent with exponential backoff for 429 errors."""
+    delay = 5  # Start with 5s
+    full_text = ""
+    
+    for attempt in range(max_retries + 1):
+        try:
+            full_text = "" # Reset for each attempt
+            async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=message):
+                 if event.content and event.content.parts:
+                     for part in event.content.parts:
+                         if part.text: full_text += part.text
+            return full_text
+            
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                if attempt < max_retries:
+                    print(f"  [429 Error] Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(delay)
+                    delay *= 2 # Exponential backoff
+                else:
+                    raise e
+            else:
+                raise e
+    return full_text
 
 async def generate_weekly_plan_rag(user_goal: str, available_workouts: list = None) -> dict:
     """
-    Generates a 1-week workout plan using ADK Agents and Vector Search.
-    
-    Args:
-        user_goal: The user's fitness goal.
-        available_workouts: Ignored (retrieval is done via vector search).
+    Generates a 1-week workout plan using ADK Agents and Vector Search (Manual Orchestration).
     """
-    
-    runner = Runner(
-        agent=planning_pipeline,
-        app_name="fitness_coach_planner",
-        session_service=InMemorySessionService()
-    )
-    
+    session_service = InMemorySessionService()
     user_id = "user_" + str(uuid.uuid4())[:8]
     session_id = "session_" + str(uuid.uuid4())[:8]
+    app_name = "fitness_coach_planner"
     
-    # Create session
-    await runner.session_service.create_session(
-        app_name="fitness_coach_planner",
+    await session_service.create_session(
+        app_name=app_name,
         user_id=user_id,
         session_id=session_id
     )
     
+    print(f"Generating plan for: {user_goal}")
+
+    # 1. Run Skeleton Agent
+    print("--- Step 1: Generating Skeleton ---")
+    skeleton_runner = Runner(agent=skeleton_agent, app_name=app_name, session_service=session_service)
     prompt = f"Create a workout plan for goal: {user_goal}"
     content = types.Content(role="user", parts=[types.Part(text=prompt)])
     
-    final_text = ""
-    
+    skeleton_text = ""
     try:
-        async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=content):
-            # We are interested in the final output from the Assembler
-            # But the runner yields events for all agents.
-            # We capture the content as it streams.
-            # However, for SequentialAgent, we need to know WHICH agent produced the content.
-            # The last agent (Assembler) produces the final JSON.
-            
-            if event.content and event.content.parts:
-                # We can check event.author if available, or just accumulate.
-                # In SequentialAgent, usually the final response to the user is the output of the sequence.
-                # But intermediate agents might also output.
-                # Opik tracing will show details. For the return value, we need the JSON.
-                
-                # Logic: The PlanAssembler is the last one.
-                if hasattr(event, 'author') and event.author == "PlanAssembler":
-                    for part in event.content.parts:
-                        if part.text:
-                            final_text += part.text
-                elif not hasattr(event, 'author'):
-                     # Fallback if author not set (sometimes happens in simple runners)
-                     # But with SequentialAgent, it should be set.
-                     # Let's accumulate everything and try to parse the last JSON block.
-                     pass
-
+        skeleton_text = await _run_agent_with_retry(skeleton_runner, user_id, session_id, content)
     except Exception as e:
-        print(f"ADK Pipeline Error: {e}")
-        # Return fallback
-        return {
-            "weekly_focus": "Error Generating Plan",
-            "schedule": [{"day": i, "day_name": d, "is_rest": True, "workout_id": None, "activity": "Rest", "notes": f"Error: {str(e)}"} for i, d in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], 1)]
-        }
+        print(f"Skeleton Agent Error: {e}")
+        return _fallback_error_plan(str(e))
+
+    # Parse Skeleton
+    try:
+        clean_skel = skeleton_text.replace("```json", "").replace("```", "").strip()
+        # Handle potential leading text before json
+        if "{" in clean_skel:
+            clean_skel = clean_skel[clean_skel.find("{"):clean_skel.rfind("}")+1]
+        skeleton_json = json.loads(clean_skel)
+        print("Skeleton generated successfully.")
+    except Exception as e:
+        print(f"Skeleton parsing failed: {e}\nText: {skeleton_text}")
+        return _fallback_error_plan("Failed to parse skeleton")
+
+    # 2. Manual Retrieval Loop
+    print("--- Step 2: Retrieving Workouts ---")
+    schedule = []
+    days = skeleton_json.get("days", [])
+    
+    for day in days:
+        day_num = day.get("day")
+        query = day.get("search_query", "")
+        focus = day.get("focus", "")
         
-    # Parse the accumulated text
-    # Since we might have missed 'author' check or it might stream in chunks, 
-    # and we know the last agent outputs the JSON we want.
-    # Let's actually assume the 'final_text' logic needs to be robust.
+        selected_workout = None
+        
+        # Check if it's a rest day
+        is_rest = False
+        focus_lower = focus.lower()
+        if "rest" in focus_lower or "recovery" in focus_lower or "stretch" in focus_lower:
+             is_rest = True
+             
+        if not is_rest and query:
+             try:
+                 # Call tool directly
+                 results_json = search_workouts_tool(query)
+                 results = json.loads(results_json)
+                 
+                 if results and isinstance(results, list) and len(results) > 0:
+                     # Pick the first one (best match)
+                     first = results[0]
+                     # Verify it's not an error/fallback
+                     if not str(first.get("id", "")).startswith("fallback"):
+                         selected_workout = first
+                     else:
+                         print(f"  Day {day_num}: Tool returned fallback for '{query}'")
+                 else:
+                     print(f"  Day {day_num}: No results for '{query}'")
+             except Exception as e:
+                 print(f"  Day {day_num}: Retrieval error: {e}")
+        
+        schedule.append({
+            "day": day_num,
+            "focus": focus,
+            "selected_workout": selected_workout
+        })
+        
+    retrieved_plan = {"schedule": schedule}
     
-    # Better approach: Read from session state if possible? 
-    # InMemoryRunner session state might hold the output_keys.
+    # Update Session State for Assembler
+    session = await session_service.get_session(app_name=app_name, session_id=session_id, user_id=user_id)
+    # Store as string to simulate LLM context or object if supported
+    # Storing as object in state is better if Agent can read it. 
+    # But instructions say "check session state". 
+    session.state["retrieved_plan"] = json.dumps(retrieved_plan) 
     
-    session = await runner.session_service.get_session(app_name="fitness_coach_planner", session_id=session_id, user_id=user_id)
+    # 3. Run Assembler Agent
+    print("--- Step 3: Assembling Plan ---")
+    assembler_runner = Runner(agent=assembler_agent, app_name=app_name, session_service=session_service)
     
+    # Pass the plan explicitly in the prompt to avoid "code writing" behavior
+    retrieved_plan_str = json.dumps(retrieved_plan, indent=2)
+    assemble_prompt = f"""
+    Assemble the final plan based on the following retrieved plan:
+    
+    {retrieved_plan_str}
+    
+    Output ONLY JSON.
+    """
+    assemble_content = types.Content(role="user", parts=[types.Part(text=assemble_prompt)])
+    
+    final_text = ""
+    try:
+        final_text = await _run_agent_with_retry(assembler_runner, user_id, session_id, assemble_content)
+    except Exception as e:
+        print(f"Assembler Agent Error: {e}")
+        return _fallback_error_plan(str(e))
+                 
+    # Parse Final Plan
     final_plan_json = None
-    retrieved_plan_json = None
+    try:
+        clean_text = final_text.replace("```json", "").replace("```", "").strip()
+        if "{" in clean_text:
+            clean_text = clean_text[clean_text.find("{"):clean_text.rfind("}")+1]
+        final_plan_json = json.loads(clean_text)
+        print("Plan assembled successfully.")
+    except Exception as e:
+        print(f"Final plan parsing failed: {e}\nText: {final_text}")
+        return _fallback_error_plan("Failed to parse final plan")
 
-    # 1. Parse Retrieved Plan (to get workout details)
-    if session and session.state and "retrieved_plan" in session.state:
-        try:
-            r_plan_content = session.state["retrieved_plan"]
-            if hasattr(r_plan_content, 'parts'):
-                r_text = extract_text_from_content(r_plan_content)
-            else:
-                r_text = str(r_plan_content)
-            
-            r_clean = r_text.replace("```json", "").replace("```", "").strip()
-            retrieved_plan_json = json.loads(r_clean)
-        except Exception as e:
-            print(f"Error parsing retrieved_plan for details: {e}")
-
-    # 2. Parse Final Plan
-    if session and session.state and "final_plan" in session.state:
-        try:
-            plan_text = session.state["final_plan"]
-            if hasattr(plan_text, 'parts'): # Content object
-                text = extract_text_from_content(plan_text)
-            else:
-                text = str(plan_text)
-                
-            clean_text = text.replace("```json", "").replace("```", "").strip()
-            final_plan_json = json.loads(clean_text)
-        except Exception as e:
-            print(f"Error parsing session state final_plan: {e}")
-    
-    # Fallback if final_plan not in session (captured from stream)
-    if not final_plan_json and final_text:
-        try:
-            clean_text = final_text.replace("```json", "").replace("```", "").strip()
-            final_plan_json = json.loads(clean_text)
-        except Exception as e:
-            print(f"Error parsing captured text: {e}")
-
-    # 3. Enrich Final Plan with Details
+    # 4. Enrich Final Plan
     if final_plan_json:
-        return enrich_plan_with_details(final_plan_json, retrieved_plan_json)
+        return enrich_plan_with_details(final_plan_json, retrieved_plan)
             
-    # Ultimate Fallback
+    return _fallback_error_plan("Unknown error")
+
+def _fallback_error_plan(error_msg):
     return {
-        "weekly_focus": "Fallback Plan (Parsing Error)",
+        "weekly_focus": f"Error Generating Plan: {error_msg}",
         "schedule": [{"day": i, "day_name": d, "is_rest": True, "workout_id": None, "activity": "Rest"} for i, d in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], 1)]
     }
+
 
 def enrich_plan_with_details(final_plan_json, retrieved_plan_json):
     """
     Helper function to merge workout details from retrieved_plan into final_plan.
+    Merges based on Day Number to be robust against ID hallucinations.
     """
-    workout_details_map = {}
+    day_details_map = {}
     
     if retrieved_plan_json and "schedule" in retrieved_plan_json:
         for day_item in retrieved_plan_json["schedule"]:
+            day_num = day_item.get("day")
             w = day_item.get("selected_workout")
-            if w and isinstance(w, dict) and w.get("id"):
-                workout_details_map[w["id"]] = w
+            if day_num is not None and w:
+                day_details_map[day_num] = w
                 
     if final_plan_json and "schedule" in final_plan_json:
         for day in final_plan_json["schedule"]:
-            w_id = day.get("workout_id")
-            if w_id and w_id in workout_details_map:
-                day["workout_details"] = workout_details_map[w_id]
-            elif w_id:
-                print(f"Warning: Details missing for workout_id {w_id}")
+            day_num = day.get("day")
+            
+            if day_num in day_details_map:
+                w = day_details_map[day_num]
+                # Overwrite/Enrich with authoritative data from Retrieval
+                day["workout_details"] = w
+                day["workout_id"] = w.get("id")
+                # Update display info to match the actual workout
+                day["activity"] = w.get("display_title") or w.get("title") or day.get("activity")
+                # Ensure is_rest matches reality of having a workout
+                day["is_rest"] = False
+            elif day.get("is_rest") is False and not day.get("workout_id"):
+                 # Assembler thought it's a workout day but Retrieval found nothing?
+                 # Mark as rest to avoid broken UI
+                 day["is_rest"] = True
+                 day["activity"] = "Rest (No workout found)"
                 
     return final_plan_json

@@ -24,27 +24,10 @@ interface WorkoutDay {
   difficulty?: string;
 }
 
-// Helper to extract thumbnail
-const getYoutubeThumbnail = (url: string) => {
-  try {
-    const videoIdMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    if (videoIdMatch && videoIdMatch[1]) {
-      return `https://img.youtube.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
-    }
-    return null;
-  } catch (e) {
-    return null;
-  }
-};
-
 // Helper to map backend day to frontend WorkoutDay
 const mapToWorkoutDay = (day: any): WorkoutDay => {
   const details = day.workout_details || {};
-  const thumbnail = details.thumbnail || 
-                  details.thumbnail_url || 
-                  (details.url ? getYoutubeThumbnail(details.url) : null) || 
-                  'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1080';
-
+  
   // Handle focus which might be an array or string
   let focusText = '';
   if (Array.isArray(details.focus)) {
@@ -63,11 +46,11 @@ const mapToWorkoutDay = (day: any): WorkoutDay => {
   return {
     id: `day-${day.day}`,
     day: day.day,
-    title: details.title || day.activity || `Day ${day.day}`,
+    title: day.activity || `Day ${day.day}`,
     exercises: focusText,
     duration: details.duration_mins ? `${details.duration_mins} min` : (details.duration || ''),
-    thumbnail: thumbnail,
-    videoUrl: details.url || null,
+    thumbnail: details.thumbnail,
+    videoUrl: details.url,
     isRestDay: day.is_rest || false,
     notes: day.notes,
     difficulty: details.difficulty
