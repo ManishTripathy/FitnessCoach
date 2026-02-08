@@ -16,6 +16,7 @@ from firebase_admin import credentials, firestore
 # Add backend directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from backend.services.ai_service import generate_text_embedding
+from backend.services.ai.core import get_runner, run_agent, extract_text_from_content
 from backend.core.config import settings
 
 # Google ADK Imports
@@ -220,6 +221,55 @@ def infer_focus(title):
     if not focus: focus.append("General Fitness")
     return list(set(focus))
 
+async def enrich_workout_metadata(title: str, description: str, duration_str: str) -> Dict[str, Any]:
+    """
+    Uses Gemini to infer difficulty, equipment, and a clean display title.
+    """
+    prompt = f"""
+    You are a fitness data classifier. Analyze the following workout video metadata and extract/infer the structured data below.
+
+    Video Title: {title}
+    Description: {description[:500]}
+    Duration: {duration_str}
+
+    **Requirements**:
+    1. display_title: Clean, short (5-7 words) title. Remove trainer name, emojis, marketing fluff (e.g. "Brutal", "No Repeat"). Keep workout type/focus (e.g. "20 Min HIIT Full Body").
+    2. difficulty_score: Integer 0-10 based on duration, intensity (HIIT/Tabata=High), impact, etc.
+    3. difficulty: "Beginner" (0-2), "Intermediate" (3-6), or "Advanced" (7-10).
+    4. difficulty_reason: Array of 2-4 short strings explaining the score (e.g. "High impact jumps", "Long duration").
+    5. equipments: Array of strings (e.g. "Dumbbells", "Kettlebell", "None"). Use "None" if bodyweight only.
+
+    **Output JSON**:
+    {{
+      "display_title": "string",
+      "difficulty_score": int,
+      "difficulty": "string",
+      "difficulty_reason": ["string"],
+      "equipments": ["string"]
+    }}
+    """
+    
+    runner = get_runner(
+        model_name="gemini-2.0-flash",
+        config=types.GenerateContentConfig(response_mime_type="application/json")
+    )
+    
+    try:
+        parts = [types.Part(text=prompt)]
+        result_content = await run_agent(runner, parts)
+        text_response = extract_text_from_content(result_content)
+        return json.loads(text_response)
+    except Exception as e:
+        print(f"     ! Metadata enrichment failed: {e}")
+        # Fallback
+        return {
+            "display_title": title[:50],
+            "difficulty_score": 5,
+            "difficulty": "Intermediate",
+            "difficulty_reason": ["Default fallback"],
+            "equipments": []
+        }
+
 async def process_playlist(db, playlist_info, trainer_name, limit_per_playlist=5):
     """
     Fetches videos from a playlist using YouTube Data API.
@@ -279,6 +329,10 @@ async def process_playlist(db, playlist_info, trainer_name, limit_per_playlist=5
                 # Add playlist tag
                 focus.append(f"Program: {playlist_title}")
                 
+                # Enrich Metadata (LLM Call)
+                print(f"     > Enriching metadata for: {title[:30]}...")
+                enriched_data = await enrich_workout_metadata(title, description, duration_str)
+                
                 doc_id = f"{vid_id}"
                 
                 workout = {
@@ -287,11 +341,17 @@ async def process_playlist(db, playlist_info, trainer_name, limit_per_playlist=5
                     "trainer": trainer_name,
                     "url": f"https://www.youtube.com/watch?v={vid_id}",
                     "duration_mins": duration_mins,
-                    "difficulty": "Intermediate",
                     "focus": focus,
                     "description": f"From program: {playlist_title}. {title} - {description[:100]}...",
                     "thumbnail": thumbnail_url,
-                    "playlist_id": playlist_id
+                    "playlist_id": playlist_id,
+                    
+                    # Enriched Fields
+                    "display_title": enriched_data.get("display_title", title),
+                    "difficulty": enriched_data.get("difficulty", "Intermediate"),
+                    "difficulty_score": enriched_data.get("difficulty_score", 5),
+                    "difficulty_reason": enriched_data.get("difficulty_reason", []),
+                    "equipments": enriched_data.get("equipments", [])
                 }
                 
                 # Generate Embedding
