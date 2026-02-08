@@ -422,7 +422,14 @@ async def process_playlist(db, playlist_info, trainer_name, limit_per_playlist=5
                 }
                 
                 # Generate Embedding
-                text_to_embed = f"{workout['title']} {workout['description']} {' '.join(workout['focus'])}"
+                text_to_embed = f"""
+                    Workout type: {', '.join(workout.get('focus', []))}
+                    Trainer: {workout.get('trainer')}
+                    Difficulty: {workout.get('difficulty')}
+                    Difficulty score: {workout.get('difficulty_score')}
+                    Duration: {workout.get('duration_mins')} minutes
+                    Equipment: {', '.join(workout.get('equipments', [])) or 'Bodyweight'}
+                    """
                 embedding = generate_text_embedding(text_to_embed)
                 if embedding:
                     workout['embedding'] = embedding
