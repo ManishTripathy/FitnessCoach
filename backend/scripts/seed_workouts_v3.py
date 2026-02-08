@@ -3,33 +3,13 @@ import os
 import sys
 import json
 import argparse
+import re
 from typing import List, Dict, Any
 
-# Monkey patch for httpx compatibility
-import httpx
-from youtubesearchpython.core.requests import RequestCore
-from youtubesearchpython.core.constants import userAgent
+# Google API Client
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
-def patched_syncPostRequest(self) -> httpx.Response:
-    return httpx.post(
-        self.url,
-        headers={"User-Agent": userAgent},
-        json=self.data,
-        timeout=self.timeout
-    )
-
-def patched_syncGetRequest(self) -> httpx.Response:
-    return httpx.get(
-        self.url,
-        headers={"User-Agent": userAgent},
-        timeout=self.timeout,
-        cookies={'CONSENT': 'YES+1'}
-    )
-
-RequestCore.syncPostRequest = patched_syncPostRequest
-RequestCore.syncGetRequest = patched_syncGetRequest
-
-from youtubesearchpython import PlaylistsSearch, VideosSearch
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -41,7 +21,6 @@ from backend.core.config import settings
 # Google ADK Imports
 from google.adk.agents.llm_agent import Agent
 from google.adk.runners import Runner
-from google.adk.models import Gemini
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
@@ -49,31 +28,70 @@ from google.genai import types
 import opik
 from opik.integrations.adk import OpikTracer, track_adk_agent_recursive
 
+
 # Configure Opik (assumes OPIK_API_KEY is set in environment or local setup)
 opik.configure(use_local=False)
+
+# --- Helpers ---
+
+def get_youtube_service():
+    """Initializes and returns the YouTube Data API service."""
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        print("Error: GOOGLE_API_KEY not found in environment.")
+        return None
+    return build('youtube', 'v3', developerKey=api_key)
+
+def parse_iso_duration(duration_str: str) -> int:
+    """Parses ISO 8601 duration (PT#M#S) to minutes."""
+    try:
+        # Simple regex for PT#H#M#S
+        match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_str)
+        if not match:
+            return 20 # Default
+        
+        hours = int(match.group(1) or 0)
+        minutes = int(match.group(2) or 0)
+        seconds = int(match.group(3) or 0)
+        
+        total_minutes = (hours * 60) + minutes + (1 if seconds >= 30 else 0)
+        return total_minutes if total_minutes > 0 else 1
+    except Exception:
+        return 20
 
 # --- Tools ---
 
 def search_youtube_playlists(trainer_name: str) -> List[Dict[str, Any]]:
     """
-    Searches YouTube for playlists by a specific trainer.
+    Searches YouTube for playlists by a specific trainer using YouTube Data API.
     Returns a list of playlists with title, id, and thumbnails.
     """
     print(f"Tool called: Searching playlists for {trainer_name}...")
+    youtube = get_youtube_service()
+    if not youtube:
+        print("Error: YouTube service not initialized.")
+        return []
+
     try:
-        search = PlaylistsSearch(f"{trainer_name} workout", limit=15)
-        results = search.result()
+        # Search for playlists
+        request = youtube.search().list(
+            part="snippet",
+            maxResults=15,
+            q=f"{trainer_name} workout",
+            type="playlist"
+        )
+        response = request.execute()
         
         playlists = []
-        if 'result' in results:
-            for item in results['result']:
-                playlists.append({
-                    "title": item.get('title'),
-                    "id": item.get('id'),
-                    "link": item.get('link'),
-                    "thumbnail": item.get('thumbnails', [{}])[0].get('url', ''),
-                    "channel": item.get('channel', {}).get('name')
-                })
+        for item in response.get("items", []):
+            snippet = item.get("snippet", {})
+            playlists.append({
+                "title": snippet.get("title"),
+                "id": item.get("id", {}).get("playlistId"),
+                "link": f"https://www.youtube.com/playlist?list={item.get('id', {}).get('playlistId')}",
+                "thumbnail": snippet.get("thumbnails", {}).get("high", {}).get("url", ""),
+                "channel": snippet.get("channelTitle")
+            })
         return playlists
     except Exception as e:
         print(f"Error in search_youtube_playlists: {e}")
@@ -86,8 +104,7 @@ async def get_curated_playlists(trainer_name: str) -> List[Dict[str, Any]]:
     Uses an ADK Agent to search and filter playlists.
     """
     
-    # 1. Define the tool for the model
-    # Note: In ADK/GenAI, we define tools as function declarations
+    # 1. Define the tool
     tools = [search_youtube_playlists]
     
     # 2. Define the Agent
@@ -109,15 +126,13 @@ async def get_curated_playlists(trainer_name: str) -> List[Dict[str, Any]]:
     - "reason": Why you approved it (e.g., "Structured workout program")
     """
     
-    # model = "gemini-2.0-flash"
-    model = Gemini(model="gemini-2.0-flash", tools=tools)
-    
+    model = "gemini-2.0-flash"
     agent = Agent(
         name="playlist_curator",
         model=model,
         description="Agent as Fitness Content Curator",
         instruction=system_instruction,
-        # tools=tools
+        tools=tools
     )
     
     # Configure Opik tracer
@@ -126,9 +141,8 @@ async def get_curated_playlists(trainer_name: str) -> List[Dict[str, Any]]:
         tags=["seed-script", "curation"],
         metadata={
             "environment": "development",
-            "model": "gemini-2.0-flash",
+            "model": model,
             "framework": "google-adk",
-            "example": "basic"
         },
         project_name="fitness_coach"
     )
@@ -195,17 +209,6 @@ def initialize_firebase():
         print(f"Error initializing Firebase: {e}")
         return None
 
-def parse_duration(duration_str):
-    try:
-        parts = list(map(int, duration_str.split(':')))
-        if len(parts) == 2:
-            return parts[0] + (1 if parts[1] >= 30 else 0)
-        elif len(parts) == 3:
-            return parts[0] * 60 + parts[1] + (1 if parts[2] >= 30 else 0)
-        return 0
-    except:
-        return 20
-
 def infer_focus(title):
     title_lower = title.lower()
     focus = []
@@ -219,50 +222,74 @@ def infer_focus(title):
 
 async def process_playlist(db, playlist_info, trainer_name, limit_per_playlist=5):
     """
-    Fetches videos using search query combined with playlist title (Workaround for broken Playlist class).
+    Fetches videos from a playlist using YouTube Data API.
     """
     playlist_id = playlist_info['id']
     playlist_title = playlist_info['title']
     print(f"  -> Processing Playlist: {playlist_title}")
     
+    youtube = get_youtube_service()
+    if not youtube:
+        return 0
+
     try:
-        # Search for videos matching "Trainer Playlist Title workout"
-        query = f"{trainer_name} {playlist_title} workout"
-        search = VideosSearch(query, limit=limit_per_playlist)
-        results = search.result()
+        # 1. Get Playlist Items (Video IDs)
+        # We fetch a bit more than limit to account for private videos etc
+        pl_request = youtube.playlistItems().list(
+            part="snippet,contentDetails",
+            playlistId=playlist_id,
+            maxResults=limit_per_playlist + 2 
+        )
+        pl_response = pl_request.execute()
         
-        videos = []
-        if 'result' in results:
-            videos = results['result']
-             
+        video_ids = []
+        for item in pl_response.get("items", []):
+            vid_id = item.get("contentDetails", {}).get("videoId")
+            if vid_id:
+                video_ids.append(vid_id)
+        
+        if not video_ids:
+            print("     ! No videos found in playlist.")
+            return 0
+            
+        # 2. Get Video Details (Duration, Tags, etc.)
+        vid_request = youtube.videos().list(
+            part="snippet,contentDetails",
+            id=",".join(video_ids[:limit_per_playlist])
+        )
+        vid_response = vid_request.execute()
+        
         collection_ref = db.collection('workout_library')
         count = 0
         
-        for video in videos:
+        for video in vid_response.get("items", []):
             try:
-                title = video.get('title')
-                video_id = video.get('id')
-                thumbnails = video.get('thumbnails', [])
-                thumbnail_url = thumbnails[0]['url'] if thumbnails else ""
+                vid_id = video.get("id")
+                snippet = video.get("snippet", {})
+                content_details = video.get("contentDetails", {})
                 
-                doc_id = f"{video_id}"
+                title = snippet.get("title")
+                description = snippet.get("description", "")
+                thumbnail_url = snippet.get("thumbnails", {}).get("high", {}).get("url", "")
                 
-                duration_str = video.get('duration', '20:00')
-                duration_mins = parse_duration(duration_str)
+                duration_str = content_details.get("duration", "PT20M")
+                duration_mins = parse_iso_duration(duration_str)
+                
                 focus = infer_focus(title)
-                
                 # Add playlist tag
                 focus.append(f"Program: {playlist_title}")
+                
+                doc_id = f"{vid_id}"
                 
                 workout = {
                     "id": doc_id,
                     "title": title,
                     "trainer": trainer_name,
-                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                    "url": f"https://www.youtube.com/watch?v={vid_id}",
                     "duration_mins": duration_mins,
                     "difficulty": "Intermediate",
                     "focus": focus,
-                    "description": f"From program: {playlist_title}. {title}",
+                    "description": f"From program: {playlist_title}. {title} - {description[:100]}...",
                     "thumbnail": thumbnail_url,
                     "playlist_id": playlist_id
                 }

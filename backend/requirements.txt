@@ -6,5 +6,4 @@ python-dotenv
 pydantic
 python-multipart
 google-adk
-youtube-search-python
 opik
