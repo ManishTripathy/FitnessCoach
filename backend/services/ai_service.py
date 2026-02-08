@@ -1,4 +1,9 @@
 
+import os
+import uuid
+import base64
+import json
+
 from google import genai
 from google.genai import types
 from google.adk.agents.llm_agent import Agent
@@ -6,10 +11,13 @@ from google.adk.runners import Runner
 from google.adk.models import Gemini
 from google.adk.sessions import InMemorySessionService
 from backend.core.config import settings
-import json
-import base64
-import uuid
-import os
+
+# Opik Integration
+import opik
+from opik.integrations.adk import OpikTracer, track_adk_agent_recursive
+
+# Configure Opik (assumes OPIK_API_KEY is set in environment or local setup)
+opik.configure(use_local=False)
 
 # Ensure API key is set for ADK/GenAI
 if settings.GOOGLE_API_KEY:
@@ -30,11 +38,27 @@ async def check_ai_connection():
     status["api_key_present"] = True
     
     try:
+        # Configure Opik tracer for test
+        opik_tracer = OpikTracer(
+            name="test_agent",
+            tags=["health-check"],
+            metadata={
+                "environment": "development",
+                "model": "gemini-2.0-flash",
+                "framework": "google-adk",
+            },
+            project_name="fitness_coach"
+        )
+
         # Use a simple agent to test connection
         agent = Agent(
             name="test_agent", 
-            model=Gemini(model="gemini-2.0-flash")
+            model=Gemini(model="gemini-2.0-flash"),
         )
+        
+        # Add Opik callbacks
+        track_adk_agent_recursive(agent, opik_tracer)
+        
         session_service = InMemorySessionService()
         runner = Runner(
             agent=agent,
@@ -70,13 +94,29 @@ def _get_runner(model_name: str, instruction: str = "", config: types.GenerateCo
     if not settings.GOOGLE_API_KEY:
         raise ValueError("GOOGLE_API_KEY is not set")
     
+    # Configure Opik tracer
+    opik_tracer = OpikTracer(
+        name="fitness_coach_agent",
+        tags=["ai-service"],
+        metadata={
+            "environment": "development",
+            "model": model_name,
+            "framework": "google-adk",
+        },
+        project_name="fitness_coach"
+    )
+
     model = Gemini(model=model_name)
     agent = Agent(
         name="fitness_coach_agent",
         model=model,
         instruction=instruction,
-        generate_content_config=config
+        generate_content_config=config,
     )
+    
+    # Add Opik callbacks
+    track_adk_agent_recursive(agent, opik_tracer)
+    
     return Runner(
         agent=agent,
         app_name="fitness_coach_app",
