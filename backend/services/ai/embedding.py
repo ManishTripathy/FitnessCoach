@@ -20,7 +20,11 @@ def generate_text_embedding(text: str) -> list:
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         response = client.models.embed_content(
             model="models/gemini-embedding-001",
-            contents=text
+            contents=text,
+            config={
+                "task_type": "SEMANTIC_SIMILARITY",
+                "output_dimensionality": 2048,
+            }
         )
         return response.embeddings[0].values
     except Exception as e:
