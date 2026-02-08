@@ -120,6 +120,8 @@ async def suggest_path(token: dict = Depends(verify_firebase_token)):
         
         return recommendation
         
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
