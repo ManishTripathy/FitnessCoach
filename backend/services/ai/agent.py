@@ -55,7 +55,7 @@ async def adjust_workout(
     # Contextualize the request
     # Flatten available workouts for context (assuming < 50 items, fits in context)
     workouts_str = "\n".join([
-        f"ID: {w['id']} | Title: {w['title']} | Duration: {w.get('duration','?')} | Focus: {w.get('focus',[])} | Difficulty: {w.get('difficulty','?')}"
+        f"ID: {w['id']} | Title: {w['title']} | Duration: {w.get('duration_mins','?')} | Focus: {w.get('focus',[])} | Difficulty: {w.get('difficulty','?')}"
         for w in available_workouts
     ])
     
