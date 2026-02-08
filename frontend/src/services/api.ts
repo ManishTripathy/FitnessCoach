@@ -171,7 +171,7 @@ export const decideApi = {
 };
 
 export const actApi = {
-  generatePlan: async (forceRefresh: boolean = false): Promise<any> => {
+  generatePlan: async (forceRefresh: boolean = false, goal?: string): Promise<any> => {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
@@ -183,7 +183,7 @@ export const actApi = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ force_refresh: forceRefresh })
+      body: JSON.stringify({ force_refresh: forceRefresh, goal })
     });
 
     if (!response.ok) throw new Error('Failed to generate plan');

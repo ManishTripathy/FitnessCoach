@@ -16,6 +16,7 @@ router = APIRouter(prefix="/act", tags=["act"])
 
 class GeneratePlanRequest(BaseModel):
     force_refresh: bool = False
+    goal: Optional[str] = None
 
 class ChatRequest(BaseModel):
     message: str
@@ -168,16 +169,39 @@ async def generate_plan(
         user_ref = db.collection("user_progress").document(user_id)
         user_doc = user_ref.get()
         
+        target_goal = request.goal
+        if not target_goal:
+            # Fallback to stored selectedPath if not provided
+            if user_doc.exists:
+                target_goal = user_doc.to_dict().get("selectedPath", "lean")
+            else:
+                target_goal = "lean"
+
         if user_doc.exists:
             data = user_doc.to_dict()
-            existing_plan = data.get("weeklyPlan")
+            
+            # Check for multi-plan storage first
+            weekly_plans = data.get("weeklyPlans", {})
+            existing_plan = weekly_plans.get(target_goal)
+            
+            # Legacy fallback: check single weeklyPlan if it matches the goal (or we just assume it might be valid if we don't have multiple)
+            # But to be safe and support the new feature, we prefer weeklyPlans.
+            # If we don't have it in weeklyPlans, we check if the old single weeklyPlan exists and maybe migration is needed? 
+            # For now, let's just generate new if not found in weeklyPlans to ensure correct goal.
+            
             if existing_plan and not request.force_refresh:
+                # Update current active weeklyPlan to this one
+                user_ref.update({
+                    "weeklyPlan": existing_plan,
+                    "selectedPath": target_goal # Ensure selectedPath is in sync
+                })
                 return {"status": "exists", "plan": existing_plan}
             
-            # Get User Goal (selected path)
-            user_goal = data.get("selectedPath", "lean") # Default to lean
+            # If we are forcing refresh, or plan doesn't exist for this goal
+            pass
         else:
-            raise HTTPException(status_code=404, detail="User progress not found")
+            # New user doc will be created below
+            pass
 
         # 2. Fetch Workouts from Library
         # In a real app with many workouts, we would use vector search here.
@@ -199,7 +223,7 @@ async def generate_plan(
             raise HTTPException(status_code=500, detail="Workout library is empty. Please seed data.")
 
         # 3. Generate Plan via AI
-        ai_result = await generate_weekly_plan_rag(user_goal, workout_library)
+        ai_result = await generate_weekly_plan_rag(target_goal, workout_library)
         
         # 4. Enrich plan with full workout details (thumbnails, urls)
         enriched_schedule = []
@@ -216,11 +240,18 @@ async def generate_plan(
         ai_result["generated_at"] = datetime.datetime.utcnow().isoformat()
         
         # 5. Save to Firestore
-        user_ref.set({
+        # We save it to weeklyPlans map AND the current weeklyPlan
+        update_data = {
+            "weeklyPlans": {
+                target_goal: ai_result
+            },
             "weeklyPlan": ai_result,
+            "selectedPath": target_goal,
             "actPhaseStarted": True,
             "lastUpdated": datetime.datetime.utcnow()
-        }, merge=True)
+        }
+        
+        user_ref.set(update_data, merge=True)
         
         return {"status": "success", "plan": ai_result}
 

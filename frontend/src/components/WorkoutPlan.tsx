@@ -45,7 +45,7 @@ const mapToWorkoutDay = (day: any): WorkoutDay => {
   return {
     id: `day-${day.day}`,
     day: day.day,
-    title: day.focus || details.title || `Day ${day.day}`,
+    title: details.display_title || `Day ${day.day}`,
     exercises: Array.isArray(details.exercises) 
       ? details.exercises.join(', ') 
       : (details.exercises || ''),
@@ -560,7 +560,6 @@ function WorkoutCard({
               <>
                 <p className="text-white/70 text-sm mb-3 font-sans">{day.exercises}</p>
                 <div className="flex items-center gap-2 text-orange-400 text-sm font-sans mb-3">
-                  <span>⏱️</span>
                   <span>{day.duration}</span>
                 </div>
 
@@ -694,7 +693,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
 
         if (user) {
            try {
-               const response = await actApi.generatePlan();
+               const response = await actApi.generatePlan(false, goalType);
                if (response.plan && response.plan.schedule) {
                    scheduleData = response.plan.schedule;
                } else if (response.schedule) {
