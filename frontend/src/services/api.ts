@@ -128,9 +128,6 @@ export const observeApi = {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) {
-        // Wait a bit for auth to initialize if it's null? 
-        // Or assume caller checks.
-        // Let's try to get token if user exists, otherwise fail.
         throw new Error('User not authenticated');
     }
     const token = await user.getIdToken();
@@ -169,6 +166,46 @@ export const decideApi = {
         throw new Error('Failed to get suggestion');
     }
     
+    return response.json();
+  }
+};
+
+export const actApi = {
+  generatePlan: async (forceRefresh: boolean = false): Promise<any> => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    const token = await user.getIdToken();
+
+    const response = await fetch(`${API_BASE}/act/generate-plan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ force_refresh: forceRefresh })
+    });
+
+    if (!response.ok) throw new Error('Failed to generate plan');
+    return response.json();
+  },
+
+  chatWithAgent: async (message: string, dayId: string, currentPlan?: any): Promise<any> => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    const token = await user.getIdToken();
+
+    const response = await fetch(`${API_BASE}/act/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ message, day_id: dayId, current_plan: currentPlan })
+    });
+
+    if (!response.ok) throw new Error('Chat failed');
     return response.json();
   }
 };

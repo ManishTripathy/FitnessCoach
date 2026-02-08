@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Camera, ArrowLeft } from 'lucide-react';
+import { Upload, Camera } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { anonymousApi, observeApi, decideApi } from '../services/api';
 import { AuthModal } from './AuthModal';
@@ -22,7 +22,6 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
-  const [isGenerating, setIsGenerating] = useState(false);
   const [selectedBodyType, setSelectedBodyType] = useState<number | null>(null);
   const [isAISuggested, setIsAISuggested] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -298,7 +297,6 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
       setAnalysisResults(results);
 
       // Trigger generation of potential transformations
-      setIsGenerating(true);
       const goals = ['lean', 'athletic', 'muscle'];
       
       // We don't await this block to block the UI, but we want to show loading states

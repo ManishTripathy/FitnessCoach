@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, GripVertical, Play, MessageCircle, X, AlertCircle, Maximize2, Send, Info } from 'lucide-react';
+import { GripVertical, Play, MessageCircle, X, AlertCircle, Maximize2, Send } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { anonymousApi } from '../services/api';
+import { getAuth } from 'firebase/auth';
+import { anonymousApi, actApi } from '../services/api';
 import { Header } from './Header';
 
 interface WorkoutPlanProps {
@@ -20,6 +21,40 @@ interface WorkoutDay {
   videoUrl?: string;
   isRestDay: boolean;
 }
+
+// Helper to extract thumbnail
+const getYoutubeThumbnail = (url: string) => {
+  try {
+    const videoIdMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    if (videoIdMatch && videoIdMatch[1]) {
+      return `https://img.youtube.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Helper to map backend day to frontend WorkoutDay
+const mapToWorkoutDay = (day: any): WorkoutDay => {
+  const details = day.workout_details || {};
+  const thumbnail = details.thumbnail_url || 
+                  (details.url ? getYoutubeThumbnail(details.url) : null) || 
+                  'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1080';
+
+  return {
+    id: `day-${day.day}`,
+    day: day.day,
+    title: day.focus || details.title || `Day ${day.day}`,
+    exercises: Array.isArray(details.exercises) 
+      ? details.exercises.join(', ') 
+      : (details.exercises || ''),
+    duration: details.duration || '',
+    thumbnail: thumbnail,
+    videoUrl: details.url || null,
+    isRestDay: day.is_rest || false,
+  };
+};
 
 interface DragItem {
   index: number;
@@ -327,13 +362,15 @@ function WorkoutCard({
   index, 
   moveCard,
   isActiveChatDay,
-  onChatToggle
+  onChatToggle,
+  onUpdateDay
 }: { 
   day: WorkoutDay; 
   index: number; 
   moveCard: (dragIndex: number, hoverIndex: number) => void;
   isActiveChatDay: boolean;
   onChatToggle: (dayId: string) => void;
+  onUpdateDay: (dayId: string, updatedDay: WorkoutDay) => void;
 }) {
   const [showExpandedModal, setShowExpandedModal] = useState(false);
   const [cardRef, setCardRef] = useState<HTMLDivElement | null>(null);
@@ -343,13 +380,44 @@ function WorkoutCard({
     { id: '1', text: 'Need any adjustments? 💪', sender: 'ryan' }
   ]);
   
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       text,
       sender: 'user'
     };
     setMessages(prev => [...prev, newMessage]);
+    
+    try {
+      const result = await actApi.chatWithAgent(text, day.id);
+      
+      if (result.status === 'success') {
+        const agentMsg: ChatMessage = {
+          id: Date.now().toString() + '_ryan',
+          text: result.response_text,
+          sender: 'ryan'
+        };
+        setMessages(prev => [...prev, agentMsg]);
+        
+        if (result.action === 'ADJUST_WORKOUT' && result.updated_day) {
+          const newDay = mapToWorkoutDay(result.updated_day);
+          onUpdateDay(day.id, newDay);
+        }
+      } else {
+        setMessages(prev => [...prev, { 
+          id: Date.now().toString(), 
+          text: result.response_text || "I'm having trouble understanding that.", 
+          sender: 'ryan' 
+        }]);
+      }
+    } catch (e) {
+      console.error(e);
+      setMessages(prev => [...prev, { 
+        id: Date.now().toString(), 
+        text: "Sorry, I lost connection. Please try again.", 
+        sender: 'ryan' 
+      }]);
+    }
   };
   
   const [{ isDragging }, drag] = useDrag({
@@ -616,45 +684,37 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
     if (fetchedGoal.current === goalType) return;
     fetchedGoal.current = goalType;
 
-    const getYoutubeThumbnail = (url: string) => {
-      try {
-        // Handle standard youtube URLs
-        const videoIdMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-        if (videoIdMatch && videoIdMatch[1]) {
-          return `https://img.youtube.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
-        }
-        return null;
-      } catch (e) {
-        return null;
-      }
-    };
-
     const fetchPlan = async () => {
       try {
         setIsLoading(true);
-        const data = await anonymousApi.generatePlan(goalType);
+        const auth = getAuth();
+        const user = auth.currentUser;
         
-        if (data && data.schedule) {
-          const mappedDays: WorkoutDay[] = data.schedule.map((day: any) => {
-            const details = day.workout_details || {};
-            // Use provided thumbnail, or extract from YouTube URL, or use a default fallback
-            const thumbnail = details.thumbnail_url || 
-                            (details.url ? getYoutubeThumbnail(details.url) : null) || 
-                            'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1080';
+        let scheduleData: any[] = [];
 
-            return {
-              id: `day-${day.day}`,
-              day: day.day,
-              title: day.focus || details.title || `Day ${day.day}`,
-              exercises: Array.isArray(details.exercises) 
-                ? details.exercises.join(', ') 
-                : (details.exercises || ''),
-              duration: details.duration || '',
-              thumbnail: thumbnail,
-              videoUrl: details.url || null,
-              isRestDay: day.is_rest || false,
-            };
-          });
+        if (user) {
+           try {
+               const response = await actApi.generatePlan();
+               if (response.plan && response.plan.schedule) {
+                   scheduleData = response.plan.schedule;
+               } else if (response.schedule) {
+                   scheduleData = response.schedule;
+               }
+           } catch (e) {
+               console.error("Failed to fetch user plan, falling back to anonymous", e);
+               // Fallback or re-throw? Ideally show error.
+               // But if token is invalid, maybe fallback.
+               throw e;
+           }
+        } else {
+           const data = await anonymousApi.generatePlan(goalType);
+           if (data && data.schedule) {
+               scheduleData = data.schedule;
+           }
+        }
+        
+        if (scheduleData.length > 0) {
+          const mappedDays: WorkoutDay[] = scheduleData.map(mapToWorkoutDay);
           setWorkoutDays(mappedDays);
         }
       } catch (err) {
@@ -683,6 +743,10 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
     }));
     
     setWorkoutDays(updatedCards);
+  };
+
+  const handleUpdateDay = (dayId: string, updatedDay: WorkoutDay) => {
+    setWorkoutDays(prev => prev.map(d => d.id === dayId ? updatedDay : d));
   };
 
   const fitnessVideos = [
@@ -801,6 +865,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
                   moveCard={moveCard}
                   isActiveChatDay={activeChatDay === day.id}
                   onChatToggle={toggleChatDay}
+                  onUpdateDay={handleUpdateDay}
                 />
               ))}
             </div>
