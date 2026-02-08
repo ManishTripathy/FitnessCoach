@@ -20,6 +20,8 @@ interface WorkoutDay {
   thumbnail?: string;
   videoUrl?: string;
   isRestDay: boolean;
+  notes?: string;
+  difficulty?: string;
 }
 
 // Helper to extract thumbnail
@@ -38,21 +40,37 @@ const getYoutubeThumbnail = (url: string) => {
 // Helper to map backend day to frontend WorkoutDay
 const mapToWorkoutDay = (day: any): WorkoutDay => {
   const details = day.workout_details || {};
-  const thumbnail = details.thumbnail_url || 
+  const thumbnail = details.thumbnail || 
+                  details.thumbnail_url || 
                   (details.url ? getYoutubeThumbnail(details.url) : null) || 
                   'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1080';
+
+  // Handle focus which might be an array or string
+  let focusText = '';
+  if (Array.isArray(details.focus)) {
+    focusText = details.focus.join(', ');
+  } else if (typeof details.focus === 'string') {
+    focusText = details.focus;
+  }
+
+  // Fallback to legacy exercises field
+  if (!focusText) {
+    focusText = Array.isArray(details.exercises) 
+      ? details.exercises.join(', ') 
+      : (details.exercises || '');
+  }
 
   return {
     id: `day-${day.day}`,
     day: day.day,
-    title: details.display_title || `Day ${day.day}`,
-    exercises: Array.isArray(details.exercises) 
-      ? details.exercises.join(', ') 
-      : (details.exercises || ''),
-    duration: details.duration || '',
+    title: details.title || day.activity || `Day ${day.day}`,
+    exercises: focusText,
+    duration: details.duration_mins ? `${details.duration_mins} min` : (details.duration || ''),
     thumbnail: thumbnail,
     videoUrl: details.url || null,
     isRestDay: day.is_rest || false,
+    notes: day.notes,
+    difficulty: details.difficulty
   };
 };
 
@@ -554,6 +572,15 @@ function WorkoutCard({
                   Rest
                 </span>
               )}
+              {!day.isRestDay && day.difficulty && (
+                 <span className={`px-3 py-1 rounded-full text-xs font-semibold font-sans ${
+                   day.difficulty.toLowerCase().includes('beginner') ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                   day.difficulty.toLowerCase().includes('intermediate') ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                   'bg-red-500/20 text-red-400 border border-red-500/30'
+                 }`}>
+                   {day.difficulty}
+                 </span>
+              )}
             </div>
             <h3 className="text-lg sm:text-xl font-bold text-white mb-1 font-sans">{day.title}</h3>
             {!day.isRestDay && (
@@ -562,6 +589,13 @@ function WorkoutCard({
                 <div className="flex items-center gap-2 text-orange-400 text-sm font-sans mb-3">
                   <span>{day.duration}</span>
                 </div>
+
+                {day.notes && (
+                  <div className="flex items-start gap-2 mb-4 bg-white/5 p-3 rounded-lg border border-white/5">
+                     <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                     <p className="text-white/80 text-xs font-sans italic">{day.notes}</p>
+                  </div>
+                )}
 
                 {/* Quick Feedback Section - Mobile Responsive */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mt-3 pt-3 border-t border-white/5">
@@ -707,7 +741,9 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
            }
         } else {
            const data = await anonymousApi.generatePlan(goalType);
-           if (data && data.schedule) {
+           if (data && data.plan && data.plan.schedule) {
+               scheduleData = data.plan.schedule;
+           } else if (data && data.schedule) {
                scheduleData = data.schedule;
            }
         }
