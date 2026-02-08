@@ -84,7 +84,7 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     const auth = getAuth();
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setIsLoggedIn(!!user);
+      setIsLoggedIn(!!user && !user.isAnonymous);
       
       if (storedSession) {
         setSessionId(storedSession);
@@ -174,6 +174,20 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     setError(null);
 
     try {
+        // Migrate data if logged in before suggesting
+        if (isLoggedIn && sessionId) {
+            const auth = getAuth();
+            if (auth.currentUser) {
+                try {
+                    const token = await auth.currentUser.getIdToken();
+                    await anonymousApi.migrateData(sessionId, token);
+                } catch (e) {
+                    // Ignore if already migrated or session not found (might have been migrated previously)
+                    console.log("Migration check:", e);
+                }
+            }
+        }
+
         let data;
         if (isLoggedIn) {
             data = await decideApi.suggestPath();
@@ -212,8 +226,21 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     setIsAISuggested(false);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedBodyType !== null) {
+      // Migrate data if logged in before continuing
+      if (isLoggedIn && sessionId) {
+          const auth = getAuth();
+          if (auth.currentUser) {
+              try {
+                  const token = await auth.currentUser.getIdToken();
+                  await anonymousApi.migrateData(sessionId, token);
+              } catch (e) {
+                  console.log("Migration check:", e);
+              }
+          }
+      }
+
       const goalKey = potentialBodies[selectedBodyType].type.toLowerCase();
       navigate(`/plan/${goalKey}`);
     }
@@ -286,19 +313,19 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
           }
       });
 
-      // If user is logged in, automatically migrate the new analysis to their profile
+      // If user is logged in, we will migrate data when they proceed (Suggest or Continue)
+      // to avoid race conditions with image generation
+      /* 
       const auth = getAuth();
       if (auth.currentUser) {
           try {
               const token = await auth.currentUser.getIdToken();
               await anonymousApi.migrateData(sessionId, token);
-              // Note: Session is deleted from anonymous store, but we keep the ID 
-              // because observeApi.getScan can now retrieve it from user profile
           } catch (migrateErr) {
               console.error("Auto-migration failed", migrateErr);
-              // Don't fail the analysis display, just log it
           }
       }
+      */
 
     } catch (err: any) {
       console.error("Analysis failed", err);

@@ -91,7 +91,8 @@ async def suggest_path(token: dict = Depends(verify_firebase_token)):
         generated_images = data.get("generatedImages", [])
         
         if not original_path or len(generated_images) < 3:
-             raise HTTPException(status_code=400, detail="Missing images for analysis.")
+             print(f"Suggest Error: Missing images. Original: {original_path}, Generated Count: {len(generated_images)}")
+             raise HTTPException(status_code=400, detail=f"Missing images for analysis. Found {len(generated_images)} generated images.")
 
         # Map goals to paths
         image_paths = {img['goal']: img['path'] for img in generated_images}

@@ -4,6 +4,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
+from firebase_admin import firestore
 from backend.services.firebase_service import save_anonymous_session, get_anonymous_session, delete_anonymous_session, get_bucket, get_db, download_file_as_bytes
 from backend.services.ai_service import analyze_body_image, generate_future_physique, recommend_fitness_path, generate_weekly_plan_rag
 from backend.services.mock_service import try_get_mock_plan, try_get_mock_analyze, try_get_mock_generate, try_get_mock_suggest
@@ -134,24 +135,37 @@ async def generate_anonymous_physique(request: GenerateRequest):
         blob.upload_from_string(generated_bytes, content_type="image/jpeg")
         blob.make_public()
         
-        # Save to session
-        # We want to append to a list or update a dict of generated images
-        current_generated = session.get("generated_images", [])
-        # Check if goal already exists and update it, or append
-        existing_idx = next((i for i, item in enumerate(current_generated) if item["goal"] == request.goal), -1)
-        
+        # Save to session safely using transaction to avoid race conditions
         new_entry = {
             "goal": request.goal,
             "url": blob.public_url,
             "path": save_path
         }
-        
-        if existing_idx >= 0:
-            current_generated[existing_idx] = new_entry
-        else:
-            current_generated.append(new_entry)
+
+        @firestore.transactional
+        def update_session_transaction(transaction, session_ref, entry):
+            snapshot = session_ref.get(transaction=transaction)
+            if not snapshot.exists:
+                return False
             
-        save_anonymous_session(request.session_id, {"generated_images": current_generated})
+            session_data = snapshot.to_dict()
+            current_generated = session_data.get("generated_images", [])
+            
+            # Check if goal already exists and update it, or append
+            existing_idx = next((i for i, item in enumerate(current_generated) if item["goal"] == entry["goal"]), -1)
+            
+            if existing_idx >= 0:
+                current_generated[existing_idx] = entry
+            else:
+                current_generated.append(entry)
+                
+            transaction.update(session_ref, {"generated_images": current_generated})
+            return True
+
+        db = get_db()
+        session_ref = db.collection('anonymous_sessions').document(request.session_id)
+        transaction = db.transaction()
+        update_session_transaction(transaction, session_ref, new_entry)
         
         return {"url": blob.public_url, "path": save_path, "goal": request.goal}
         
