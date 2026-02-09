@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Menu, MessageCircle, AlertCircle, Check, FastForward, Pause } from 'lucide-react';
 import { Header } from '../components/Header';
 
 const Landing: React.FC = () => {
@@ -111,23 +112,100 @@ const Landing: React.FC = () => {
               {/* Phone Notch */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-black rounded-b-3xl z-10"></div>
               
-              {/* App Content - Placeholder */}
-              <div className="relative h-full w-full bg-gradient-to-b from-slate-900 via-black to-slate-900 overflow-y-auto">
-                <div className="flex flex-col items-center justify-center min-h-full px-8 py-16">
-                  
-                  {/* Visual Element */}
-                  <div className="relative mb-8">
-                    <div className="w-48 h-48 rounded-full bg-gradient-to-br from-orange-500/30 to-red-500/30 flex items-center justify-center overflow-hidden shadow-lg shadow-orange-500/30 backdrop-blur-sm border border-orange-500/20">
-                      <div className="text-6xl">💪</div>
-                    </div>
-                    <div className="absolute -bottom-2 -right-2 w-20 h-20 rounded-full bg-gradient-to-br from-orange-400 to-red-500 opacity-40 blur-xl"></div>
-                  </div>
+              {/* App Content - Mock Interface */}
+              <div className="relative h-full w-full bg-[#1c1c1e] overflow-y-auto text-white font-sans no-scrollbar">
+                {/* Status Bar Mock */}
+                <div className="flex justify-between items-center px-6 pt-12 pb-4 bg-gradient-to-b from-black/50 to-transparent">
+                  <ArrowLeft className="w-6 h-6 text-white cursor-pointer" />
+                  <div className="text-xl font-bold tracking-tight"><span className="text-orange-500">Ryan</span> Coach</div>
+                  <Menu className="w-6 h-6 text-white cursor-pointer" />
+                </div>
 
-                  {/* Placeholder text in phone */}
-                  <div className="text-center space-y-3">
-                    <p className="text-sm text-white/50">
-                      App preview coming soon...
-                    </p>
+                {/* Header Text */}
+                <div className="px-6 py-4">
+                  <h2 className="text-4xl font-black leading-[0.95] tracking-tight">
+                    Your <br />
+                    <span className="text-orange-500">Shredded</span> Plan
+                  </h2>
+                  <p className="text-gray-400 mt-3 text-sm font-medium">
+                    7-day personalized workout schedule • <br/>Drag to reorder
+                  </p>
+                </div>
+
+                {/* Card */}
+                <div className="px-4 pb-8">
+                  <div className="bg-[#2c2c2e] rounded-[2rem] overflow-hidden p-4 shadow-2xl border border-white/5">
+                    {/* Image Area */}
+                    <div className="relative h-48 rounded-2xl overflow-hidden mb-4 group">
+                      <img 
+                        src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80" 
+                        alt="Workout" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                      
+                      {/* Chat Bubble */}
+                      <div className="absolute top-3 right-3 bg-orange-500 p-2 rounded-full shadow-lg">
+                         <MessageCircle className="w-5 h-5 text-white" />
+                      </div>
+                      
+                      {/* Overlay Text */}
+                      <div className="absolute bottom-3 left-3">
+                         {/* <div className="text-white/90 font-bold text-3xl italic tracking-tighter drop-shadow-lg" style={{ fontFamily: 'cursive' }}>DAY 1</div> */}
+                         <div className="text-white font-black text-3xl leading-none uppercase drop-shadow-lg tracking-wide">FULL BODY</div>
+                      </div>
+                    </div>
+
+                    {/* Badges */}
+                    <div className="flex gap-2 mb-4">
+                      <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md shadow-orange-500/20">Day 1</span>
+                      <span className="bg-yellow-900/40 text-yellow-500 px-3 py-1 rounded-full text-xs font-bold border border-yellow-600/30">Intermediate</span>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-xl font-bold text-white mb-1 leading-tight">30 Minute Full Body Workout</h3>
+                    <div className="flex items-center gap-2 mb-5 text-sm font-medium">
+                      <span className="text-gray-400">Full Body</span>
+                      <span className="text-orange-500">35 min</span>
+                    </div>
+
+                    {/* Note Box */}
+                    <div className="bg-[#3a3a3c] rounded-2xl p-4 mb-6 flex gap-3 border border-white/5">
+                      <AlertCircle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-gray-300 italic leading-relaxed">
+                        Kicking off the week with a full body workout to engage all major muscle groups and build a solid foundation for the week's activities.
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="space-y-5">
+                      <div>
+                        <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">Completed?</p>
+                        <div className="flex gap-3">
+                           <button className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center border border-green-500/30 hover:bg-green-500/30 transition-colors">
+                             <Check className="w-6 h-6 text-green-500" />
+                           </button>
+                           <button className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center border border-blue-500/30 hover:bg-blue-500/30 transition-colors">
+                             <FastForward className="w-6 h-6 text-blue-500" />
+                           </button>
+                           <button className="w-12 h-12 bg-gray-700/50 rounded-xl flex items-center justify-center border border-gray-600/30 hover:bg-gray-700 transition-colors">
+                             <Pause className="w-6 h-6 text-gray-400" />
+                           </button>
+                        </div>
+                      </div>
+
+                      <div>
+                         <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">Effort</p>
+                         <div className="flex gap-3">
+                            {['😋', '💪', '😅', '🥵'].map((emoji, i) => (
+                              <button key={i} className="w-12 h-12 bg-[#3a3a3c] rounded-xl flex items-center justify-center text-2xl hover:bg-[#4a4a4c] hover:scale-110 transition-all border border-white/5 shadow-lg">
+                                {emoji}
+                              </button>
+                            ))}
+                         </div>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               </div>
