@@ -26,19 +26,21 @@ opik_tracer = OpikTracer(
 
 # --- Tools ---
 
-def search_workouts_tool(query: str) -> str:
+def search_workouts_tool(query: str, max_duration: Optional[int] = None, min_duration: Optional[int] = None) -> str:
     """
     Searches for workouts using semantic vector search against the workout library.
     
     Args:
         query: The search query description (e.g. "high intensity leg workout").
+        max_duration: Optional maximum duration in minutes.
+        min_duration: Optional minimum duration in minutes.
         
     Returns:
         JSON string list of matching workouts with details (id, title, focus, difficulty).
     """
     import sys
-    print(f"[Tool] Searching workouts for: '{query}'", file=sys.stderr)
-    print(f"[Tool] Searching workouts for: '{query}'")
+    print(f"[Tool] Searching workouts for: '{query}' (max={max_duration}, min={min_duration})", file=sys.stderr)
+    print(f"[Tool] Searching workouts for: '{query}' (max={max_duration}, min={min_duration})")
     
     db = get_db()
     if not db:
@@ -63,11 +65,13 @@ def search_workouts_tool(query: str) -> str:
         
         # We assume the 'embedding' field exists and is indexed
         print(f"[Tool] Executing vector query with dim={len(query_embedding)}...")
+        
+        # Fetch more candidates to allow effective post-filtering
         vector_query = collection.find_nearest(
             vector_field="embedding",
             query_vector=Vector(query_embedding),
             distance_measure=DistanceMeasure.COSINE,
-            limit=3  # Fetch top 3 to give the agent options
+            limit=50  # Increased limit for better recall with filters
         )
         
         results = vector_query.get()
@@ -76,6 +80,14 @@ def search_workouts_tool(query: str) -> str:
         workouts = []
         for doc in results:
             data = doc.to_dict()
+            
+            # Apply duration filters
+            duration = data.get("duration_mins")
+            if max_duration is not None and isinstance(duration, (int, float)) and duration > max_duration:
+                continue
+            if min_duration is not None and isinstance(duration, (int, float)) and duration < min_duration:
+                continue
+                
             # Clean up data for the agent
             workout_clean = {
                 "id": data.get("id"),

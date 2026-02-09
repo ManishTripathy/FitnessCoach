@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from backend.core.deps import verify_firebase_token
 from backend.services.ai_service import generate_weekly_plan_rag
-from backend.services.ai.agent import detect_intent, adjust_workout
+from backend.services.ai.agent import detect_intent_multi_agent, adjust_workout_multi_agent
 from backend.services.firebase_service import get_db
 from backend.services.mock_service import try_get_mock_plan
 from backend.core.config import settings
@@ -51,32 +51,26 @@ async def chat_agent(
 
         # 2. Get Context (Workout for that day)
         target_day = next((d for d in current_plan.get('schedule', []) if d['day'] == day_index), None)
+        workout_details = target_day.get("workout_details") if target_day else {}
         context = {
             "day_index": day_index,
-            "workout_title": target_day.get('activity') if target_day else "Unknown"
+            "workout_title": target_day.get('activity') if target_day else "Unknown",
+            "current_duration_mins": workout_details.get("duration_mins") if workout_details else None,
+            "current_focus": workout_details.get("focus") if workout_details else None
         }
         
         # 3. Detect Intent
-        intent = await detect_intent(request.message, context)
+        intent_data = await detect_intent_multi_agent(request.message, context)
+        print("Intent Data:", intent_data)
+        intent = str(intent_data.get("intent", "OTHER")).upper()
+        print("Detected Intent:", intent)
         
         if intent == "ADJUST_WORKOUT":
-            # Fetch library for alternatives
-            workouts_ref = db.collection("workout_library").stream()
-            workout_library = []
-            workout_map = {}
-            for doc in workouts_ref:
-                w_data = doc.to_dict()
-                w_data['id'] = doc.id
-                if 'embedding' in w_data: del w_data['embedding']
-                workout_library.append(w_data)
-                workout_map[doc.id] = w_data
-                
-            # Perform Adjustment
-            adjustment_result = await adjust_workout(
-                request.message, 
-                day_index, 
-                current_plan, 
-                workout_library
+            adjustment_result = await adjust_workout_multi_agent(
+                request.message,
+                day_index,
+                current_plan,
+                intent_data
             )
             
             if adjustment_result.get("success"):
@@ -86,19 +80,18 @@ async def chat_agent(
                 
                 for day in current_plan.get("schedule", []):
                     if day['day'] == day_index:
-                        # Update this day
                         day['is_rest'] = adjustment_result['is_rest']
                         day['workout_id'] = adjustment_result['new_workout_id']
-                        day['activity'] = adjustment_result['new_activity_title']
-                        day['notes'] = adjustment_result['summary'] # Store reason in notes?
+                        selected_workout = adjustment_result.get("selected_workout")
+                        day['activity'] = adjustment_result.get('new_activity_title') or (selected_workout or {}).get("display_title") or (selected_workout or {}).get("title")
+                        day['notes'] = adjustment_result['summary']
                         
-                        # Re-enrich if it's a real workout
                         if not day['is_rest'] and day['workout_id']:
-                             w_id = day['workout_id']
-                             if w_id in workout_map:
-                                 day['workout_details'] = workout_map[w_id]
+                             day['workout_details'] = selected_workout
                         else:
                              day['workout_details'] = None
+                             if not day.get('activity'):
+                                  day['activity'] = "Rest"
                              
                         updated_day_data = day
                     new_schedule.append(day)
