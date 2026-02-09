@@ -134,29 +134,30 @@ def _normalize_media_url(value: Optional[str]) -> Optional[str]:
     return value.strip().strip("`")
 
 async def detect_intent_multi_agent(message: str, context: Dict[str, Any]) -> Dict[str, Any]:
-    agent = Agent(
-        name="IntentDetector",
-        model="gemini-2.0-flash",
-        generate_content_config=types.GenerateContentConfig(response_mime_type="application/json"),
-        instruction="""
-        You are an intent classifier for a fitness coach AI.
-        You must output ONLY JSON.
-        Classify the intent into one of these categories:
-        - ADJUST_WORKOUT
-        - EXPLAIN_WORKOUT
-        - MOTIVATION
-        - OTHER
+    instruction = """
+    You are an intent classifier for a fitness coach AI.
+    You must output ONLY JSON.
+    Classify the intent into one of these categories:
+    - ADJUST_WORKOUT: User wants to change duration, difficulty, or swap the workout.
+      Examples: "too hard", "only have 20 mins", "change this", "Between 10 to 15 mins please", "shorter", "longer".
+    - EXPLAIN_WORKOUT: User asks about the workout details or technique.
+      Examples: "what is this?", "how to do pushups", "explain the focus".
+    - MOTIVATION: User seeks encouragement.
+    - OTHER: Anything else.
 
-        Output JSON:
-        {
-          "intent": "ADJUST_WORKOUT|EXPLAIN_WORKOUT|MOTIVATION|OTHER"
-        }
-        """
+    Output JSON:
+    {
+      "intent": "ADJUST_WORKOUT|EXPLAIN_WORKOUT|MOTIVATION|OTHER"
+    }
+    """
+    
+    runner = get_runner(
+        model_name="gemini-2.0-flash",
+        instruction=instruction,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
+        tracer_name="IntentDetector"
     )
-    runner = Runner(agent=agent, app_name="fitness_coach_adjust", session_service=InMemorySessionService())
-    user_id = "user_" + str(uuid.uuid4())[:8]
-    session_id = "session_" + str(uuid.uuid4())[:8]
-    await runner.session_service.create_session(app_name="fitness_coach_adjust", user_id=user_id, session_id=session_id)
+    
     prompt = f"""
     User Message: "{message}"
     Context: Day {context.get('day_index', '?')}
@@ -164,16 +165,16 @@ async def detect_intent_multi_agent(message: str, context: Dict[str, Any]) -> Di
     Current Duration (mins): {context.get('current_duration_mins')}
     Current Focus: {context.get('current_focus')}
     """
-    content = types.Content(role="user", parts=[types.Part(text=prompt)])
-    final_text = ""
-    async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=content):
-        if event.content and event.content.parts:
-            for part in event.content.parts:
-                if part.text:
-                    final_text += part.text
-    clean_text = final_text.replace("```json", "").replace("```", "").strip()
+    
     try:
-        return json.loads(clean_text)
+        parts = [types.Part(text=prompt)]
+        content = await run_agent(runner, parts)
+        text_resp = extract_text_from_content(content)
+        clean_text = text_resp.replace("```json", "").replace("```", "").strip()
+        result = json.loads(clean_text)
+        if isinstance(result, list):
+            result = result[0]
+        return result
     except Exception:
         return {"intent": "OTHER"}
 
@@ -256,35 +257,34 @@ async def build_semantic_query_agent(
     prev_focus: List[str],
     next_focus: List[str]
 ) -> str:
-    agent = Agent(
-        name="SemanticQueryBuilder",
-        model="gemini-2.0-flash",
-        generate_content_config=types.GenerateContentConfig(response_mime_type="application/json"),
-        instruction="""
-        You create a single semantic search query for a workout database.
-        You must output ONLY JSON.
-        Use this embedding format as guidance:
-        Workout type: <focus>
-        Trainer: <trainer>
-        Difficulty: <difficulty>
-        Difficulty score: <score>
-        Duration: <minutes> minutes
-        Equipment: <equipment list or Bodyweight>
+    instruction = """
+    You create a single semantic search query for a workout database.
+    You must output ONLY JSON.
+    Use this embedding format as guidance:
+    Workout type: <focus>
+    Trainer: <trainer>
+    Difficulty: <difficulty>
+    Difficulty score: <score>
+    Duration: <minutes> minutes
+    Equipment: <equipment list or Bodyweight>
 
-        Build a concise query that includes:
-        - desired focus or workout type
-        - duration constraint if provided
-        - equipment if relevant
-        - avoid repeating adjacent day focus when possible
+    Build a concise query that includes:
+    - desired focus or workout type
+    - duration constraint if provided
+    - equipment if relevant
+    - avoid repeating adjacent day focus when possible
 
-        Output JSON:
-        { "query": "<one-line query>" }
-        """
+    Output JSON:
+    { "query": "<one-line query>" }
+    """
+    
+    runner = get_runner(
+        model_name="gemini-2.0-flash",
+        instruction=instruction,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
+        tracer_name="SemanticQueryBuilder"
     )
-    runner = Runner(agent=agent, app_name="fitness_coach_adjust", session_service=InMemorySessionService())
-    user_id = "user_" + str(uuid.uuid4())[:8]
-    session_id = "session_" + str(uuid.uuid4())[:8]
-    await runner.session_service.create_session(app_name="fitness_coach_adjust", user_id=user_id, session_id=session_id)
+
     workout_details = target_day.get("workout_details") or {}
     prompt = f"""
     User Message: "{user_message}"
@@ -298,16 +298,15 @@ async def build_semantic_query_agent(
     Adjacent Day Focus: {json.dumps({"prev": prev_focus, "next": next_focus})}
     Duration Constraint: max={max_duration}, min={min_duration}
     """
-    content = types.Content(role="user", parts=[types.Part(text=prompt)])
-    final_text = ""
-    async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=content):
-        if event.content and event.content.parts:
-            for part in event.content.parts:
-                if part.text:
-                    final_text += part.text
-    clean_text = final_text.replace("```json", "").replace("```", "").strip()
+    
     try:
+        parts = [types.Part(text=prompt)]
+        content = await run_agent(runner, parts)
+        text_resp = extract_text_from_content(content)
+        clean_text = text_resp.replace("```json", "").replace("```", "").strip()
         result = json.loads(clean_text)
+        if isinstance(result, list):
+            result = result[0]
         return str(result.get("query", "")).strip()
     except Exception:
         return ""

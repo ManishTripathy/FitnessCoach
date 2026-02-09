@@ -2,6 +2,7 @@ import os
 import uuid
 import base64
 import json
+import asyncio
 from typing import Optional, Dict, Any, List
 
 from google import genai
@@ -90,13 +91,13 @@ async def check_ai_connection() -> Dict[str, Any]:
         
     return status
 
-def get_runner(model_name: str, instruction: str = "", config: types.GenerateContentConfig = None) -> Runner:
+def get_runner(model_name: str, instruction: str = "", config: types.GenerateContentConfig = None, tracer_name: str = "fitness_coach_agent") -> Runner:
     if not settings.GOOGLE_API_KEY:
         raise ValueError("GOOGLE_API_KEY is not set")
     
     # Configure Opik tracer
     opik_tracer = OpikTracer(
-        name="fitness_coach_agent",
+        name=tracer_name,
         tags=["ai-service"],
         metadata={
             "environment": "development",
@@ -123,26 +124,35 @@ def get_runner(model_name: str, instruction: str = "", config: types.GenerateCon
         session_service=InMemorySessionService()
     )
 
-async def run_agent(runner: Runner, parts: list) -> types.Content:
+async def run_agent(runner: Runner, parts: list, max_retries: int = 3) -> types.Content:
     content = types.Content(role="user", parts=parts)
-    # Use dummy IDs as these are stateless calls
-    uid = str(uuid.uuid4())
-    sid = str(uuid.uuid4())
-    
-    # Ensure session exists on the runner's service
-    await runner.session_service.create_session(
-        app_name="fitness_coach_app",
-        user_id=uid,
-        session_id=sid
-    )
     
     final_content = None
+    delay = 2  # Start with 2s delay
     
-    # Consume the async generator
-    async for event in runner.run_async(user_id=uid, session_id=sid, new_message=content):
-        if event.content:
-            final_content = event.content
+    for attempt in range(max_retries + 1):
+        # Generate fresh session for each attempt to avoid history pollution (e.g. duplicating user messages on retry)
+        uid = str(uuid.uuid4())[:8]
+        sid = str(uuid.uuid4())[:8]
+        # Ensure session exists
+        await runner.session_service.create_session(app_name="fitness_coach_app", user_id=uid, session_id=sid)
+        
+        try:
+            async for event in runner.run_async(user_id=uid, session_id=sid, new_message=content):
+                if event.content:
+                    final_content = event.content
+            return final_content
             
+        except Exception as e:
+            error_msg = str(e)
+            if ("429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg) and attempt < max_retries:
+                print(f"  [429 Error] Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                await asyncio.sleep(delay)
+                delay *= 2  # Exponential backoff
+            else:
+                # If it's not a 429 or we've exhausted retries, re-raise
+                raise e
+                
     return final_content
 
 def extract_text_from_content(content: types.Content) -> str:

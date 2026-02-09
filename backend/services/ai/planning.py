@@ -121,11 +121,8 @@ def search_workouts_tool(query: str, max_duration: Optional[int] = None, min_dur
 
 # --- Agents ---
 
-# 1. Skeleton Generator
-skeleton_agent = Agent(
-    name="SkeletonGenerator",
-    model="gemini-2.0-flash",
-    instruction="""
+# Instructions
+SKELETON_INSTRUCTION = """
     You are an expert fitness planner.
     Your task is to create a WEEKLY WORKOUT SKELETON based on the user's goal.
     
@@ -150,59 +147,9 @@ skeleton_agent = Agent(
         ...
       ]
     }
-    """,
-    output_key="skeleton",
-    # before_agent_callback=opik_tracer.before_agent_callback,
-    # after_agent_callback=opik_tracer.after_agent_callback,
-    # before_model_callback=opik_tracer.before_model_callback,
-    # after_model_callback=opik_tracer.after_model_callback
-)
+    """
 
-# 2. Retrieval Specialist
-retrieval_agent = Agent(
-    name="RetrievalSpecialist",
-    model="gemini-2.0-flash",
-    instruction="""
-    You are a Workout Retrieval Specialist.
-    You will receive a Weekly Skeleton (check session state 'skeleton').
-    
-    CRITICAL INSTRUCTION: You DO NOT have internal knowledge of specific workouts. You MUST use the `search_workouts_tool` to find them.
-    
-    Your task:
-    1. Parse the skeleton from session state 'skeleton'.
-    2. For EACH day in the skeleton that is NOT a Rest day:
-       - Formulate a detailed search query including activity and focus (e.g. "High intensity leg workout for mass").
-       - Call the `search_workouts_tool` with this `query`.
-       - From the results, Select the BEST single workout that fits the flow.
-       - You MUST use the actual 'id' returned by the tool. DO NOT invent IDs.
-       - If the tool returns a fallback workout (id starts with 'fallback'), use it or mark the day as Rest.
-       - You MUST include the 'url' and 'thumbnail' fields in the selected_workout object exactly as returned by the tool.
-    3. For Rest days, explicitly set activity to "Rest" or "Active Recovery".
-    
-    Output Format:
-    Return a JSON object with the selected workouts:
-    {
-       "schedule": [
-          {"day": 1, "focus": "...", "selected_workout": { "id": "...", "title": "...", "url": "...", "thumbnail": "...", ... } or null},
-          ...
-       ]
-    }
-    """,
-    tools=[search_workouts_tool],
-    output_key="retrieved_plan",
-    # before_agent_callback=opik_tracer.before_agent_callback,
-    # after_agent_callback=opik_tracer.after_agent_callback,
-    # before_model_callback=opik_tracer.before_model_callback,
-    # after_model_callback=opik_tracer.after_model_callback,
-    # before_tool_callback=opik_tracer.before_tool_callback,
-    # after_tool_callback=opik_tracer.after_tool_callback
-)
-
-# 3. Plan Assembler
-assembler_agent = Agent(
-    name="PlanAssembler",
-    model="gemini-2.0-flash",
-    instruction="""
+ASSEMBLER_INSTRUCTION = """
     You are the Final Plan Assembler.
     You will receive a schedule with selected workouts in the prompt below.
     
@@ -228,105 +175,30 @@ assembler_agent = Agent(
         ...
       ]
     }
-    """,
-    output_key="final_plan",
-    # before_agent_callback=opik_tracer.before_agent_callback,
-    # after_agent_callback=opik_tracer.after_agent_callback,
-    # before_model_callback=opik_tracer.before_model_callback,
-    # after_model_callback=opik_tracer.after_model_callback
-)
-
-# Pipeline
-planning_pipeline = SequentialAgent(
-    name="WeeklyPlanningPipeline",
-    sub_agents=[skeleton_agent, retrieval_agent, assembler_agent],
-    description="Generates skeleton, retrieves workouts, and assembles plan."
-)
-
-# Track the pipeline
-opik_tracer_pipeline = OpikTracer(
-    name="fitness-planner-pipeline",
-    tags=["planning", "rag", "multi-agent"],
-    project_name="fitness_coach"
-)
-track_adk_agent_recursive(planning_pipeline, opik_tracer_pipeline)
-
-# opik_tracer_skeleton_agent = OpikTracer(
-#     name="skeleton-agent",
-#     tags=["planning", "rag", "multi-agent"],
-#     project_name="fitness_coach"
-# )
-# track_adk_agent_recursive(skeleton_agent, opik_tracer_skeleton_agent)
-
-# opik_tracer_retrieval_agent = OpikTracer(
-#     name="retrieval-agent",
-#     tags=["planning", "rag", "multi-agent"],
-#     project_name="fitness_coach"
-# )
-# track_adk_agent_recursive(retrieval_agent, opik_tracer_retrieval_agent)
-
-# opik_tracer_assembler_agent = OpikTracer(
-#     name="assembler-agent",
-#     tags=["planning", "rag", "multi-agent"],
-#     project_name="fitness_coach"
-# )
-# track_adk_agent_recursive(assembler_agent, opik_tracer_assembler_agent)
-
-
-
-async def _run_agent_with_retry(runner, user_id, session_id, message, max_retries=3):
-    """Runs an agent with exponential backoff for 429 errors."""
-    delay = 5  # Start with 5s
-    full_text = ""
-    
-    for attempt in range(max_retries + 1):
-        try:
-            full_text = "" # Reset for each attempt
-            async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=message):
-                 if event.content and event.content.parts:
-                     for part in event.content.parts:
-                         if part.text: full_text += part.text
-            return full_text
-            
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                if attempt < max_retries:
-                    print(f"  [429 Error] Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
-                    await asyncio.sleep(delay)
-                    delay *= 2 # Exponential backoff
-                else:
-                    raise e
-            else:
-                raise e
-    return full_text
+    """
 
 async def generate_weekly_plan_rag(user_goal: str, available_workouts: list = None) -> dict:
     """
     Generates a 1-week workout plan using ADK Agents and Vector Search (Manual Orchestration).
     """
-    session_service = InMemorySessionService()
-    user_id = "user_" + str(uuid.uuid4())[:8]
-    session_id = "session_" + str(uuid.uuid4())[:8]
-    app_name = "fitness_coach_planner"
-    
-    await session_service.create_session(
-        app_name=app_name,
-        user_id=user_id,
-        session_id=session_id
-    )
-    
     print(f"Generating plan for: {user_goal}")
 
     # 1. Run Skeleton Agent
     print("--- Step 1: Generating Skeleton ---")
-    skeleton_runner = Runner(agent=skeleton_agent, app_name=app_name, session_service=session_service)
+    
+    skeleton_runner = get_runner(
+        model_name="gemini-2.0-flash",
+        instruction=SKELETON_INSTRUCTION,
+        tracer_name="SkeletonGenerator"
+    )
+    
     prompt = f"Create a workout plan for goal: {user_goal}"
     content = types.Content(role="user", parts=[types.Part(text=prompt)])
     
     skeleton_text = ""
     try:
-        skeleton_text = await _run_agent_with_retry(skeleton_runner, user_id, session_id, content)
+        skeleton_content = await run_agent(skeleton_runner, [types.Part(text=prompt)])
+        skeleton_text = extract_text_from_content(skeleton_content)
     except Exception as e:
         print(f"Skeleton Agent Error: {e}")
         return _fallback_error_plan(str(e))
@@ -388,16 +260,14 @@ async def generate_weekly_plan_rag(user_goal: str, available_workouts: list = No
         
     retrieved_plan = {"schedule": schedule}
     
-    # Update Session State for Assembler
-    session = await session_service.get_session(app_name=app_name, session_id=session_id, user_id=user_id)
-    # Store as string to simulate LLM context or object if supported
-    # Storing as object in state is better if Agent can read it. 
-    # But instructions say "check session state". 
-    session.state["retrieved_plan"] = json.dumps(retrieved_plan) 
-    
     # 3. Run Assembler Agent
     print("--- Step 3: Assembling Plan ---")
-    assembler_runner = Runner(agent=assembler_agent, app_name=app_name, session_service=session_service)
+    
+    assembler_runner = get_runner(
+        model_name="gemini-2.0-flash",
+        instruction=ASSEMBLER_INSTRUCTION,
+        tracer_name="PlanAssembler"
+    )
     
     # Pass the plan explicitly in the prompt to avoid "code writing" behavior
     retrieved_plan_str = json.dumps(retrieved_plan, indent=2)
@@ -408,11 +278,11 @@ async def generate_weekly_plan_rag(user_goal: str, available_workouts: list = No
     
     Output ONLY JSON.
     """
-    assemble_content = types.Content(role="user", parts=[types.Part(text=assemble_prompt)])
     
     final_text = ""
     try:
-        final_text = await _run_agent_with_retry(assembler_runner, user_id, session_id, assemble_content)
+        assembler_content = await run_agent(assembler_runner, [types.Part(text=assemble_prompt)])
+        final_text = extract_text_from_content(assembler_content)
     except Exception as e:
         print(f"Assembler Agent Error: {e}")
         return _fallback_error_plan(str(e))

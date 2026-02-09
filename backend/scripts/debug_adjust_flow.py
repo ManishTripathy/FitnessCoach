@@ -16,12 +16,13 @@ async def main():
             {"day": 3, "activity": "Legs", "details": {"id": "current_id", "duration_mins": 45, "focus": ["Legs"]}},
         ]
     }
-    await adjust_workout_multi_agent(
+    result_1 = await adjust_workout_multi_agent(
         user_message_1,
         3,
         plan_1,
         {"intent": "ADJUST_WORKOUT"}
     )
+    print(json.dumps(result_1, indent=2))
 
     # Test case 2: Adjust duration range (35-40)
     print("\n--- Test Case 2: Range 35-40 mins ---")
@@ -31,13 +32,13 @@ async def main():
             {"day": 5, "activity": "Back", "details": {"id": "current_id", "duration_mins": 26, "focus": ["Back"]}},
         ]
     }
-    await adjust_workout_multi_agent(
+    result_2 = await adjust_workout_multi_agent(
         user_message_2,
         5,
         plan_2,
         {"intent": "ADJUST_WORKOUT"}
     )
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result_2, indent=2))
 
 if __name__ == "__main__":
     asyncio.run(main())
