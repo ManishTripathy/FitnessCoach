@@ -582,7 +582,7 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
                   Choose Your <span className="text-orange-500">Transformation Goal</span>
                 </h2>
                 <p className="text-xl text-white/90 mb-6 font-sans">
-                  Select your dream physique and Ryan will build a custom workout & nutrition plan to get you there 🔥
+                  Select your dream physique and Ryan will build a personalized plan to get you there 🔥
                 </p>
                 
                 {/* Suggest Me Button */}
