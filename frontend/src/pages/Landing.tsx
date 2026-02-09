@@ -96,12 +96,12 @@ const Landing: React.FC = () => {
             {/* Energy stats */}
             <div className="flex gap-12 pt-6">
               <div className="space-y-2">
-                <div className="text-5xl font-black text-orange-500 font-sans">50K+</div>
-                <div className="text-base text-white/70 font-medium font-sans">Active Users</div>
+                <div className="text-5xl font-black text-orange-500 font-sans">100%</div>
+                <div className="text-base text-white/70 font-medium font-sans">Personalized Plans</div>
               </div>
               <div className="space-y-2">
-                <div className="text-5xl font-black text-orange-500 font-sans">1M+</div>
-                <div className="text-base text-white/70 font-medium font-sans">Workouts Completed</div>
+                <div className="text-5xl font-black text-orange-500 font-sans">24/7</div>
+                <div className="text-base text-white/70 font-medium font-sans">AI Coach Access</div>
               </div>
             </div>
           </div>
