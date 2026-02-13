@@ -364,7 +364,8 @@ function WorkoutCard({
   moveCard,
   isActiveChatDay,
   onChatToggle,
-  onUpdateDay
+  onUpdateDay,
+  showGuide
 }: { 
   day: WorkoutDay; 
   index: number; 
@@ -372,6 +373,7 @@ function WorkoutCard({
   isActiveChatDay: boolean;
   onChatToggle: (dayId: string) => void;
   onUpdateDay: (dayId: string, updatedDay: WorkoutDay) => void;
+  showGuide?: boolean;
 }) {
   const [showExpandedModal, setShowExpandedModal] = useState(false);
   const [cardRef, setCardRef] = useState<HTMLDivElement | null>(null);
@@ -483,27 +485,42 @@ function WorkoutCard({
 
         {/* Ryan Chat Head - Only for non-rest days */}
         {!day.isRestDay && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onChatToggle(day.id);
-            }}
-            className={`absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all z-10 ${
-              isActiveChatDay
-                ? 'bg-gradient-to-br from-orange-600 to-red-600 scale-110 ring-4 ring-orange-500/50'
-                : 'bg-gradient-to-br from-orange-500 to-red-500 hover:scale-110'
-            }`}
-            style={{ cursor: 'pointer' }}
-          >
-            {isActiveChatDay ? (
-              <div className="relative">
-                <MessageCircle className="w-5 h-5" fill="white" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
+          <div className="absolute top-4 right-4 z-10 flex flex-col items-end">
+            {showGuide && (
+              <div className="mb-2 mr-0 animate-bounce">
+                <div className="bg-orange-500 text-white px-4 py-2 rounded-xl rounded-tr-none text-xs font-bold font-sans shadow-xl whitespace-nowrap border border-white/20 relative">
+                  Need adjustments? Chat with me! 💪
+                  <div className="absolute -bottom-1 right-0 w-2 h-2 bg-orange-500 rotate-45"></div>
+                </div>
               </div>
-            ) : (
-              <MessageCircle className="w-5 h-5" />
             )}
-          </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onChatToggle(day.id);
+              }}
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all ${
+                isActiveChatDay
+                  ? 'bg-gradient-to-br from-orange-600 to-red-600 scale-110 ring-4 ring-orange-500/50'
+                  : 'bg-gradient-to-br from-orange-500 to-red-500 hover:scale-110'
+              }`}
+              style={{ cursor: 'pointer' }}
+            >
+              {isActiveChatDay ? (
+                <div className="relative">
+                  <MessageCircle className="w-5 h-5" fill="white" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <MessageCircle className="w-5 h-5" />
+                  {showGuide && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white animate-ping"></div>
+                  )}
+                </div>
+              )}
+            </button>
+          </div>
         )}
 
         <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -691,9 +708,11 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
   const [workoutDays, setWorkoutDays] = useState<WorkoutDay[]>([]);
   const fetchedGoal = useRef<string | null>(null);
   const [activeChatDay, setActiveChatDay] = useState<string | null>(null);
+  const [showChatGuide, setShowChatGuide] = useState(true);
 
   const toggleChatDay = (dayId: string) => {
     setActiveChatDay(prev => prev === dayId ? null : dayId);
+    setShowChatGuide(false);
   };
 
   useEffect(() => {
@@ -884,19 +903,13 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
                   isActiveChatDay={activeChatDay === day.id}
                   onChatToggle={toggleChatDay}
                   onUpdateDay={handleUpdateDay}
+                  showGuide={index === 0 && showChatGuide}
                 />
               ))}
             </div>
           )}
 
-          {/* Start Program Button */}
-          {!isLoading && !error && (
-            <div className="text-center pt-4">
-              <button className="bg-orange-600 text-white px-12 py-4 rounded-full hover:bg-orange-700 transition-all shadow-lg font-bold text-lg font-sans">
-                Start My Program 🔥
-              </button>
-            </div>
-          )}
+
         </div>
       </main>
 
