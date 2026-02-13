@@ -247,6 +247,29 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
     }
   };
 
+  const handleDemoPhotoSelect = async (url: string) => {
+    setIsUploading(true);
+    setError(null);
+    try {
+      setUploadedImage(url);
+      setShowAnalysis(false);
+      
+      // Fetch the image and convert to File object to reuse upload logic
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const file = new File([blob], "demo_photo.jpg", { type: "image/jpeg" });
+      
+      const uploadRes = await anonymousApi.uploadPhoto(file, sessionId);
+      setSessionId(uploadRes.session_id);
+      localStorage.setItem('anonymous_session_id', uploadRes.session_id);
+    } catch (err) {
+      console.error("Demo photo selection failed", err);
+      setError("Failed to load demo photo. Please try uploading your own.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setError(null);
@@ -389,31 +412,71 @@ export function PhotoUpload({ onBack }: PhotoUploadProps) {
               {/* Left Side: Upload Area */}
               <div className="w-full">
                 {!uploadedImage ? (
-                  <label className="flex flex-col items-center justify-center aspect-[3/4] border-2 border-dashed border-orange-500/50 rounded-2xl cursor-pointer hover:border-orange-500 transition-colors group">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                    <div className="text-center space-y-4 p-6">
-                      <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                        <Upload className="w-10 h-10 text-orange-500" />
+                  <div className="space-y-8">
+                    <label className="flex flex-col items-center justify-center aspect-[3/4] border-2 border-dashed border-orange-500/50 rounded-2xl cursor-pointer hover:border-orange-500 transition-colors group">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      <div className="text-center space-y-4 p-6">
+                        <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                          <Upload className="w-10 h-10 text-orange-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-2xl font-semibold text-white font-sans">
+                            Upload Your Photo
+                          </p>
+                          <p className="text-white/60 font-sans">
+                            Click to browse or drag and drop
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-orange-400 justify-center">
+                          <Camera className="w-5 h-5" />
+                          <span className="text-sm font-sans">Front-facing photo works best</span>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <p className="text-2xl font-semibold text-white font-sans">
-                          Upload Your Photo
-                        </p>
-                        <p className="text-white/60 font-sans">
-                          Click to browse or drag and drop
-                        </p>
+                    </label>
+
+                    {/* Demo Photos */}
+                    <div className="pt-8 space-y-6">
+                      <div className="flex flex-col sm:flex-row items-center gap-6">
+                        <div className="text-left space-y-1">
+                          <p className="text-2xl font-bold text-white/90 font-sans">No photo?</p>
+                          <p className="text-2xl font-bold text-white/90 font-sans">Try one of these:</p>
+                        </div>
+                        
+                        <div className="flex gap-4">
+                          <button
+                            onClick={() => handleDemoPhotoSelect('/demo1.jpg')}
+                            className="group relative w-20 h-20 rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-orange-500/50 transition-all hover:scale-105 active:scale-95"
+                          >
+                            <div className="absolute inset-0 flex items-center justify-center text-white/20 group-hover:text-orange-500/80 transition-colors">
+                              <Camera className="w-6 h-6" />
+                            </div>
+                            <img src="/demo1.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDemoPhotoSelect('/demo2.jpg')}
+                            className="group relative w-20 h-20 rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-orange-500/50 transition-all hover:scale-105 active:scale-95"
+                          >
+                            <div className="absolute inset-0 flex items-center justify-center text-white/20 group-hover:text-orange-500/80 transition-colors">
+                              <Camera className="w-6 h-6" />
+                            </div>
+                            <img src="/demo2.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-orange-400 justify-center">
-                        <Camera className="w-5 h-5" />
-                        <span className="text-sm font-sans">Front-facing photo works best</span>
+
+                      <div className="pt-4 border-t border-white/5">
+                        <p className="text-sm text-white/40 leading-relaxed font-sans">
+                          By uploading a photo, you agree to our <button className="text-white/60 underline hover:text-white transition-colors">Terms of Service</button>. To learn more about how Ryan Coach handles your personal data, check our <button className="text-white/60 underline hover:text-white transition-colors">Privacy Policy</button>.
+                        </p>
                       </div>
                     </div>
-                  </label>
+                  </div>
                 ) : (
                   <div className="space-y-6">
                     <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[3/4] flex items-center justify-center border border-white/10">
