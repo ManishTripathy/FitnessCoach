@@ -252,6 +252,62 @@ def _select_best_candidate(
         return c
     return filtered[0]
 
+def _select_best_candidate_relaxed(
+    candidates: List[Dict[str, Any]],
+    existing_ids: List[str],
+    prev_focus: List[str],
+    next_focus: List[str],
+    target_focus: List[str]
+) -> Optional[Dict[str, Any]]:
+    cleaned = []
+    for c in candidates:
+        workout_id = c.get("id")
+        if not workout_id or str(workout_id).startswith("fallback"):
+            continue
+        if workout_id in existing_ids:
+            continue
+        cleaned.append(c)
+    if not cleaned:
+        return None
+    prev_set = set([f.lower() for f in prev_focus or []])
+    next_set = set([f.lower() for f in next_focus or []])
+    target_set = set([f.lower() for f in target_focus or []])
+
+    def norm_focus(cand: Dict[str, Any]) -> List[str]:
+        values = cand.get("focus", []) or []
+        if isinstance(values, list):
+            return [str(f).lower() for f in values]
+        if isinstance(values, str):
+            return [values.lower()]
+        return []
+
+    def sort_by_duration(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return sorted(
+            items,
+            key=lambda x: x.get("duration_mins") if isinstance(x.get("duration_mins"), (int, float)) else 10**9
+        )
+
+    def avoid_adjacent(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        result: List[Dict[str, Any]] = []
+        for c in items:
+            focus = set(norm_focus(c))
+            if prev_set.intersection(focus) or next_set.intersection(focus):
+                continue
+            result.append(c)
+        return result
+
+    same_focus = [c for c in cleaned if target_set.intersection(norm_focus(c))]
+    same_focus_no_adj = avoid_adjacent(same_focus)
+    any_no_adj = avoid_adjacent(cleaned)
+
+    if same_focus_no_adj:
+        return sort_by_duration(same_focus_no_adj)[0]
+    if same_focus:
+        return sort_by_duration(same_focus)[0]
+    if any_no_adj:
+        return sort_by_duration(any_no_adj)[0]
+    return sort_by_duration(cleaned)[0]
+
 async def build_semantic_query_agent(
     user_message: str,
     intent: str,
@@ -332,6 +388,7 @@ async def adjust_workout_multi_agent(
         }
     workout_details = target_day.get("workout_details") or {}
     current_duration = workout_details.get("duration_mins")
+    target_focus = workout_details.get("focus") or []
     existing_ids = [
         d.get("workout_id") for d in current_plan.get("schedule", [])
         if d.get("workout_id") and d.get("day") != day_index
@@ -381,13 +438,12 @@ async def adjust_workout_multi_agent(
     )
     if not selected and (max_duration is not None or min_duration is not None):
         print("[Adjust] relaxing duration constraints")
-        selected = _select_best_candidate(
+        selected = _select_best_candidate_relaxed(
             candidates,
             existing_ids,
             prev_focus,
             next_focus,
-            None,
-            None
+            target_focus
         )
     if not selected and candidates:
         print("[Adjust] relaxing focus constraints")
@@ -407,7 +463,9 @@ async def adjust_workout_multi_agent(
             "is_rest": True,
             "summary": "Marked as rest day.",
             "agent_response": "I couldn't find a suitable match, so I set this as a rest day.",
-            "selected_workout": None
+            "selected_workout": None,
+            "requested_max_duration": max_duration,
+            "requested_min_duration": min_duration
         }
     selected["thumbnail"] = _normalize_media_url(selected.get("thumbnail"))
     selected["url"] = _normalize_media_url(selected.get("url"))
@@ -424,5 +482,7 @@ async def adjust_workout_multi_agent(
         "is_rest": False,
         "summary": summary,
         "agent_response": "Updated your plan with a better fit.",
-        "selected_workout": selected
+        "selected_workout": selected,
+        "requested_max_duration": max_duration,
+        "requested_min_duration": min_duration
     }
