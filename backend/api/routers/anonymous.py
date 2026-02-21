@@ -299,6 +299,24 @@ async def anonymous_chat_agent(request: AnonymousChatRequest):
 
         target_day = next((d for d in schedule if d.get("day") == day_index), None)
         workout_details = target_day.get("workout_details") if target_day else {}
+
+        if request.confirm:
+            if not target_day:
+                raise HTTPException(status_code=404, detail="Day not found in current plan")
+            activity = target_day.get("activity") or ("Rest" if target_day.get("is_rest") else "this workout")
+            if target_day.get("is_rest"):
+                response_text = f"All set – I've made Day {day_index} a rest day so you can recover."
+            else:
+                response_text = f"Great, I've updated Day {day_index} to \"{activity}\"."
+            return {
+                "status": "success",
+                "action": "ADJUST_WORKOUT",
+                "response_text": response_text,
+                "summary": target_day.get("notes"),
+                "updated_day": target_day,
+                "updated_plan": current_plan,
+            }
+
         context = {
             "day_index": day_index,
             "workout_title": target_day.get("activity") if target_day else "Unknown",
