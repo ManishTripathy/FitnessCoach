@@ -133,6 +133,12 @@ def _normalize_media_url(value: Optional[str]) -> Optional[str]:
         return value
     return value.strip().strip("`")
 
+def _strip_duration_terms(text: str) -> str:
+    cleaned = re.sub(r'\b\d{1,3}\s*(?:-|to|and)\s*\d{1,3}\s*(?:min|mins|minutes?)?\b', ' ', text, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\b\d{1,3}\s*(?:min|mins|minutes?)\b', ' ', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip(" ,.-")
+    return cleaned
+
 async def detect_intent_multi_agent(message: str, context: Dict[str, Any]) -> Dict[str, Any]:
     instruction = """
     You are an intent classifier for a fitness coach AI.
@@ -349,6 +355,8 @@ async def adjust_workout_multi_agent(
         prev_focus,
         next_focus
     )
+    if query_text:
+        query_text = _strip_duration_terms(query_text)
     print(f"[Adjust] intent={intent} day={day_index} current_duration={current_duration} max={max_duration} min={min_duration}")
     print(f"[Adjust] query={query_text}")
     results_json = search_workouts_tool(

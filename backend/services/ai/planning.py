@@ -78,17 +78,15 @@ def search_workouts_tool(query: str, max_duration: Optional[int] = None, min_dur
         print(f"[Tool] Vector query returned {len(results)} results.")
         
         workouts = []
-        for doc in results:
-            data = doc.to_dict()
-            
-            # Apply duration filters
+        raw_docs = [doc.to_dict() for doc in results]
+
+        for data in raw_docs:
             duration = data.get("duration_mins")
             if max_duration is not None and isinstance(duration, (int, float)) and duration > max_duration:
                 continue
             if min_duration is not None and isinstance(duration, (int, float)) and duration < min_duration:
                 continue
-                
-            # Clean up data for the agent
+
             workout_clean = {
                 "id": data.get("id"),
                 "title": data.get("title"),
@@ -106,9 +104,29 @@ def search_workouts_tool(query: str, max_duration: Optional[int] = None, min_dur
                 "description": (data.get("description", "") or "")[:200]
             }
             workouts.append(workout_clean)
-            
+
+        if not workouts and raw_docs:
+            for data in raw_docs:
+                workout_clean = {
+                    "id": data.get("id"),
+                    "title": data.get("title"),
+                    "display_title": data.get("display_title", data.get("title")),
+                    "focus": data.get("focus", []),
+                    "difficulty": data.get("difficulty"),
+                    "difficulty_score": data.get("difficulty_score"),
+                    "difficulty_reason": data.get("difficulty_reason", []),
+                    "duration_mins": data.get("duration_mins"),
+                    "equipments": data.get("equipments", []),
+                    "thumbnail": data.get("thumbnail"),
+                    "url": data.get("url"),
+                    "trainer": data.get("trainer"),
+                    "playlist_id": data.get("playlist_id"),
+                    "description": (data.get("description", "") or "")[:200]
+                }
+                workouts.append(workout_clean)
+
         if not workouts:
-             return json.dumps([{"id": "fallback", "title": "Rest or Stretch", "focus": ["Recovery"], "difficulty": "Beginner"}])
+            return json.dumps([{"id": "fallback", "title": "Rest or Stretch", "focus": ["Recovery"], "difficulty": "Beginner"}])
 
         print(f"[Tool] Found {len(workouts)} workouts for query: '{query}'")
         print(f"[Tool] Workouts: {workouts}")
