@@ -365,7 +365,9 @@ function WorkoutCard({
   isActiveChatDay,
   onChatToggle,
   onUpdateDay,
-  showGuide
+  showGuide,
+  getCurrentPlan,
+  setCurrentPlan
 }: { 
   day: WorkoutDay; 
   index: number; 
@@ -374,6 +376,8 @@ function WorkoutCard({
   onChatToggle: (dayId: string) => void;
   onUpdateDay: (dayId: string, updatedDay: WorkoutDay) => void;
   showGuide?: boolean;
+  getCurrentPlan: () => any | null;
+  setCurrentPlan: (plan: any) => void;
 }) {
   const [showExpandedModal, setShowExpandedModal] = useState(false);
   const [cardRef, setCardRef] = useState<HTMLDivElement | null>(null);
@@ -394,13 +398,13 @@ function WorkoutCard({
     try {
       const auth = getAuth();
       const user = auth.currentUser;
-
       let result: any;
 
       if (user) {
         result = await actApi.chatWithAgent(text, day.id);
       } else {
-        const currentPlan = {
+        const plan = getCurrentPlan();
+        const fallbackPlan = {
           weekly_focus: 'General Fitness',
           schedule: [
             {
@@ -414,8 +418,7 @@ function WorkoutCard({
             },
           ],
         };
-
-        result = await anonymousApi.chatWithAgent(text, day.id, currentPlan);
+        result = await anonymousApi.chatWithAgent(text, day.id, plan || fallbackPlan);
       }
       
       if (result.status === 'success') {
@@ -429,6 +432,10 @@ function WorkoutCard({
         if (result.action === 'ADJUST_WORKOUT' && result.updated_day) {
           const newDay = mapToWorkoutDay(result.updated_day);
           onUpdateDay(day.id, newDay);
+        }
+
+        if (result.updated_plan) {
+          setCurrentPlan(result.updated_plan);
         }
       } else {
         setMessages(prev => [...prev, { 
@@ -733,6 +740,7 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
   const fetchedGoal = useRef<string | null>(null);
   const [activeChatDay, setActiveChatDay] = useState<string | null>(null);
   const [showChatGuide, setShowChatGuide] = useState(true);
+  const [rawPlan, setRawPlan] = useState<any | null>(null);
 
   const toggleChatDay = (dayId: string) => {
     setActiveChatDay(prev => prev === dayId ? null : dayId);
@@ -756,8 +764,10 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
                const response = await actApi.generatePlan(false, goalType);
                if (response.plan && response.plan.schedule) {
                    scheduleData = response.plan.schedule;
+                   setRawPlan(response.plan);
                } else if (response.schedule) {
                    scheduleData = response.schedule;
+                   setRawPlan(response);
                }
            } catch (e) {
                console.error("Failed to fetch user plan, falling back to anonymous", e);
@@ -769,8 +779,10 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
            const data = await anonymousApi.generatePlan(goalType);
            if (data && data.plan && data.plan.schedule) {
                scheduleData = data.plan.schedule;
+               setRawPlan(data.plan);
            } else if (data && data.schedule) {
                scheduleData = data.schedule;
+               setRawPlan(data);
            }
         }
         
@@ -928,6 +940,8 @@ function WorkoutPlanContent({ onBack, goalType }: WorkoutPlanProps) {
                   onChatToggle={toggleChatDay}
                   onUpdateDay={handleUpdateDay}
                   showGuide={index === 0 && showChatGuide}
+                  getCurrentPlan={() => rawPlan}
+                  setCurrentPlan={setRawPlan}
                 />
               ))}
             </div>
