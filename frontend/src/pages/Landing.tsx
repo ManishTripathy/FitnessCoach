@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Menu, MessageCircle, AlertCircle, Check, FastForward, Pause } from 'lucide-react';
+import { ArrowLeft, Menu, MessageCircle, Check, FastForward, Pause } from 'lucide-react';
 import { Header } from '../components/Header';
 
 const Landing: React.FC = () => {
