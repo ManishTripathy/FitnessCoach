@@ -66,12 +66,12 @@ def search_workouts_tool(query: str, max_duration: Optional[int] = None, min_dur
         # We assume the 'embedding' field exists and is indexed
         print(f"[Tool] Executing vector query with dim={len(query_embedding)}...")
         
-        # Fetch more candidates to allow effective post-filtering
+        # Fetch a limited number of nearest neighbors for post-filtering
         vector_query = collection.find_nearest(
             vector_field="embedding",
             query_vector=Vector(query_embedding),
             distance_measure=DistanceMeasure.COSINE,
-            limit=50  # Increased limit for better recall with filters
+            limit=20  # Limit neighbors to reduce latency while keeping diversity
         )
         
         results = vector_query.get()
