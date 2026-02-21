@@ -139,6 +139,48 @@ def _strip_duration_terms(text: str) -> str:
     cleaned = re.sub(r'\s+', ' ', cleaned).strip(" ,.-")
     return cleaned
 
+def _extract_desired_focus(message: str) -> List[str]:
+    text = (message or "").lower()
+    focus: List[str] = []
+    if "leg" in text:
+        focus.append("legs")
+    if "glute" in text:
+        focus.append("glutes")
+    if "upper body" in text:
+        focus.append("upper body")
+    if "lower body" in text:
+        focus.append("lower body")
+    if "core" in text or "abs" in text:
+        focus.append("core")
+    if "back" in text:
+        focus.append("back")
+    if "chest" in text:
+        focus.append("chest")
+    if "bicep" in text:
+        focus.append("biceps")
+    if "tricep" in text:
+        focus.append("triceps")
+    if "shoulder" in text:
+        focus.append("shoulders")
+    if "arm" in text:
+        focus.append("arms")
+    if "cardio" in text:
+        focus.append("cardio")
+    if "hiit" in text:
+        focus.append("hiit")
+    if "full body" in text:
+        focus.append("full body")
+    if "general fitness" in text:
+        focus.append("general fitness")
+    # Deduplicate while preserving order
+    seen = set()
+    result: List[str] = []
+    for f in focus:
+        if f not in seen:
+            seen.add(f)
+            result.append(f)
+    return result
+
 async def detect_intent_multi_agent(message: str, context: Dict[str, Any]) -> Dict[str, Any]:
     instruction = """
     You are an intent classifier for a fitness coach AI.
@@ -388,7 +430,9 @@ async def adjust_workout_multi_agent(
         }
     workout_details = target_day.get("workout_details") or {}
     current_duration = workout_details.get("duration_mins")
-    target_focus = workout_details.get("focus") or []
+    current_focus = workout_details.get("focus") or []
+    desired_focus = _extract_desired_focus(user_message)
+    target_focus = desired_focus or current_focus
     existing_ids = [
         d.get("workout_id") for d in current_plan.get("schedule", [])
         if d.get("workout_id") and d.get("day") != day_index
@@ -436,6 +480,25 @@ async def adjust_workout_multi_agent(
         max_duration,
         min_duration
     )
+    if selected and target_focus and max_duration is None and min_duration is None:
+        raw_focus = selected.get("focus") or []
+        if isinstance(raw_focus, list):
+            sel_focus = [str(f).lower() for f in raw_focus]
+        elif isinstance(raw_focus, str):
+            sel_focus = [raw_focus.lower()]
+        else:
+            sel_focus = []
+        target_set = set([str(f).lower() for f in (target_focus or [])])
+        if not target_set.intersection(sel_focus):
+            alt = _select_best_candidate_relaxed(
+                candidates,
+                existing_ids,
+                prev_focus,
+                next_focus,
+                target_focus
+            )
+            if alt:
+                selected = alt
     if not selected and (max_duration is not None or min_duration is not None):
         print("[Adjust] relaxing duration constraints")
         selected = _select_best_candidate_relaxed(
