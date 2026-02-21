@@ -122,13 +122,13 @@ export const anonymousApi = {
     return response.json();
   },
 
-  chatWithAgent: async (message: string, dayId: string, currentPlan: any): Promise<any> => {
+  chatWithAgent: async (message: string, dayId: string, currentPlan: any, confirm: boolean = false): Promise<any> => {
     const response = await fetch(`${API_BASE}/anonymous/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message, day_id: dayId, current_plan: currentPlan }),
+      body: JSON.stringify({ message, day_id: dayId, current_plan: currentPlan, confirm }),
     });
 
     if (!response.ok) {
@@ -206,7 +206,7 @@ export const actApi = {
     return response.json();
   },
 
-  chatWithAgent: async (message: string, dayId: string, currentPlan?: any): Promise<any> => {
+  chatWithAgent: async (message: string, dayId: string, currentPlan?: any, confirm: boolean = false): Promise<any> => {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
@@ -218,7 +218,7 @@ export const actApi = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ message, day_id: dayId, current_plan: currentPlan })
+      body: JSON.stringify({ message, day_id: dayId, current_plan: currentPlan, confirm })
     });
 
     if (!response.ok) throw new Error('Chat failed');

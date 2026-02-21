@@ -22,6 +22,7 @@ class ChatRequest(BaseModel):
     message: str
     day_id: str
     current_plan: Optional[Dict[str, Any]] = None
+    confirm: bool = False
 
 @router.post("/chat")
 async def chat_agent(
@@ -74,7 +75,6 @@ async def chat_agent(
             )
             
             if adjustment_result.get("success"):
-                # Apply changes to the plan structure
                 new_schedule = []
                 updated_day_data = None
                 
@@ -87,32 +87,70 @@ async def chat_agent(
                         day['notes'] = adjustment_result['summary']
                         
                         if not day['is_rest'] and day['workout_id']:
-                             day['workout_details'] = selected_workout
+                            day['workout_details'] = selected_workout
                         else:
-                             day['workout_details'] = None
-                             if not day.get('activity'):
-                                  day['activity'] = "Rest"
-                             
+                            day['workout_details'] = None
+                            if not day.get('activity'):
+                                day['activity'] = "Rest"
+                            
                         updated_day_data = day
                     new_schedule.append(day)
                 
                 current_plan["schedule"] = new_schedule
-                
-                # Save updated plan
-                user_ref = db.collection("user_progress").document(user_id)
-                user_ref.set({
-                    "weeklyPlan": current_plan,
-                    "lastUpdated": datetime.datetime.utcnow()
-                }, merge=True)
-                
-                return {
-                    "status": "success",
-                    "action": "ADJUST_WORKOUT",
-                    "response_text": adjustment_result['agent_response'],
-                    "summary": adjustment_result['summary'],
-                    "updated_day": updated_day_data,
-                    "updated_plan": current_plan
-                }
+
+                if request.confirm:
+                    user_ref = db.collection("user_progress").document(user_id)
+                    user_ref.set({
+                        "weeklyPlan": current_plan,
+                        "lastUpdated": datetime.datetime.utcnow()
+                    }, merge=True)
+                    return {
+                        "status": "success",
+                        "action": "ADJUST_WORKOUT",
+                        "response_text": adjustment_result['agent_response'],
+                        "summary": adjustment_result['summary'],
+                        "updated_day": updated_day_data,
+                        "updated_plan": current_plan
+                    }
+                else:
+                    selected_workout = adjustment_result.get("selected_workout") or {}
+                    proposed_title = (
+                        adjustment_result.get("new_activity_title")
+                        or selected_workout.get("display_title")
+                        or selected_workout.get("title")
+                        or target_day.get("activity")
+                        or "this workout"
+                    )
+                    proposed_duration = selected_workout.get("duration_mins")
+                    is_rest = adjustment_result.get("is_rest", False)
+                    if is_rest:
+                        response_text = (
+                            f"I couldn't find a workout that fits your request well for Day {day_index}. "
+                            f"One option is to make it a rest day so your body can recover. "
+                            f"Are you okay if I change Day {day_index} to a rest day?"
+                        )
+                    else:
+                        if isinstance(proposed_duration, (int, float)):
+                            response_text = (
+                                f"Got it. Based on what you said, I would switch Day {day_index} to "
+                                f"\"{proposed_title}\" which is about {int(proposed_duration)} minutes "
+                                f"and matches your focus. Are you okay if I update Day {day_index} to this?"
+                            )
+                        else:
+                            response_text = (
+                                f"Got it. I have a workout called \"{proposed_title}\" that I think fits "
+                                f"what you asked for on Day {day_index}. Are you okay if I update "
+                                f"Day {day_index} to this?"
+                            )
+                    return {
+                        "status": "proposal",
+                        "action": "ADJUST_WORKOUT",
+                        "response_text": response_text,
+                        "summary": adjustment_result['summary'],
+                        "updated_day": updated_day_data,
+                        "updated_plan": current_plan,
+                        "confirm_required": True
+                    }
             else:
                  return {
                     "status": "error",

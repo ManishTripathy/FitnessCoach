@@ -69,6 +69,11 @@ interface ChatMessage {
   sender: 'user' | 'ryan';
 }
 
+interface PendingProposal {
+  originalText: string;
+  plan: any;
+}
+
 interface ChatStickyProps {
   day: WorkoutDay;
   onClose: () => void;
@@ -386,8 +391,40 @@ function WorkoutCard({
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: '1', text: 'Need any adjustments? 💪', sender: 'ryan' }
   ]);
+  const [pendingProposal, setPendingProposal] = useState<PendingProposal | null>(null);
   
   const handleSendMessage = async (text: string) => {
+    if (pendingProposal) {
+      if (text.trim().toLowerCase().startsWith('y')) {
+        const confirmMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text,
+          sender: 'user'
+        };
+        setMessages(prev => [...prev, confirmMessage]);
+        await handleConfirmProposal(pendingProposal);
+      } else if (text.trim().toLowerCase().startsWith('n')) {
+        const cancelMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text,
+          sender: 'user'
+        };
+        setMessages(prev => [...prev, cancelMessage, {
+          id: Date.now().toString() + '_ryan_cancel',
+          text: "No worries, I'll keep this day as it is.",
+          sender: 'ryan'
+        }]);
+        setPendingProposal(null);
+      } else {
+        const infoMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: "Please reply with yes or no so I know whether to apply the change.",
+          sender: 'ryan'
+        };
+        setMessages(prev => [...prev, infoMessage]);
+      }
+      return;
+    }
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       text,
@@ -401,7 +438,7 @@ function WorkoutCard({
       let result: any;
 
       if (user) {
-        result = await actApi.chatWithAgent(text, day.id);
+        result = await actApi.chatWithAgent(text, day.id, getCurrentPlan() || undefined, false);
       } else {
         const plan = getCurrentPlan();
         const fallbackPlan = {
@@ -418,7 +455,7 @@ function WorkoutCard({
             },
           ],
         };
-        result = await anonymousApi.chatWithAgent(text, day.id, plan || fallbackPlan);
+        result = await anonymousApi.chatWithAgent(text, day.id, plan || fallbackPlan, false);
       }
       
       if (result.status === 'success') {
@@ -437,6 +474,17 @@ function WorkoutCard({
         if (result.updated_plan) {
           setCurrentPlan(result.updated_plan);
         }
+      } else if (result.status === 'proposal' && result.confirm_required) {
+        const agentMsg: ChatMessage = {
+          id: Date.now().toString() + '_ryan',
+          text: result.response_text,
+          sender: 'ryan'
+        };
+        setMessages(prev => [...prev, agentMsg]);
+        setPendingProposal({
+          originalText: text,
+          plan: result.updated_plan || getCurrentPlan()
+        });
       } else {
         setMessages(prev => [...prev, { 
           id: Date.now().toString(), 
@@ -451,6 +499,53 @@ function WorkoutCard({
         text: "Sorry, I lost connection. Please try again.", 
         sender: 'ryan' 
       }]);
+    }
+  };
+
+  const handleConfirmProposal = async (proposal: PendingProposal) => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      let result: any;
+
+      if (user) {
+        result = await actApi.chatWithAgent(proposal.originalText, day.id, proposal.plan, true);
+      } else {
+        result = await anonymousApi.chatWithAgent(proposal.originalText, day.id, proposal.plan, true);
+      }
+
+      if (result.status === 'success') {
+        const agentMsg: ChatMessage = {
+          id: Date.now().toString() + '_ryan_confirm',
+          text: result.response_text,
+          sender: 'ryan'
+        };
+        setMessages(prev => [...prev, agentMsg]);
+
+        if (result.action === 'ADJUST_WORKOUT' && result.updated_day) {
+          const newDay = mapToWorkoutDay(result.updated_day);
+          onUpdateDay(day.id, newDay);
+        }
+
+        if (result.updated_plan) {
+          setCurrentPlan(result.updated_plan);
+        }
+      } else {
+        setMessages(prev => [...prev, { 
+          id: Date.now().toString(), 
+          text: result.response_text || "I'm having trouble updating the plan.", 
+          sender: 'ryan' 
+        }]);
+      }
+    } catch (e) {
+      console.error(e);
+      setMessages(prev => [...prev, { 
+        id: Date.now().toString(), 
+        text: "Sorry, I lost connection while applying the change. Please try again.", 
+        sender: 'ryan' 
+      }]);
+    } finally {
+      setPendingProposal(null);
     }
   };
   
