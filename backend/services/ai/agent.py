@@ -172,6 +172,149 @@ def _extract_desired_focus(message: str) -> List[str]:
         focus.append("full body")
     if "general fitness" in text:
         focus.append("general fitness")
+    seen = set()
+    result: List[str] = []
+    for f in focus:
+        if f not in seen:
+            seen.add(f)
+            result.append(f)
+    return result
+
+def _is_rest_request(message: str) -> bool:
+    text = (message or "").lower()
+    if "rest day" in text:
+        return True
+    if "make this a rest" in text:
+        return True
+    if "make this rest" in text:
+        return True
+    if "change this to rest" in text:
+        return True
+    if "skip this" in text:
+        return True
+    if "no workout" in text:
+        return True
+    if "off day" in text:
+        return True
+    if "take a rest" in text:
+        return True
+    return False
+
+async def build_adjustment_message(
+    user_message: str,
+    day_index: int,
+    current_plan: Dict[str, Any],
+    target_day: Dict[str, Any],
+    selected_workout: Optional[Dict[str, Any]],
+    is_rest: bool,
+    max_duration: Optional[int],
+    min_duration: Optional[int]
+) -> Dict[str, str]:
+    instruction = """
+    You are a friendly fitness coach assistant.
+    You must output ONLY JSON.
+    Write a short summary for the UI and a conversational message for the user.
+    If the user asked for a rest day and is_rest is true, clearly explain that you are suggesting a rest day and why it makes sense.
+    If the proposed workout does not match the requested duration window or focus, briefly explain the mismatch (for example, no workouts under 15 minutes) before suggesting the closest option.
+    Do not mention saving or confirming anything; just talk to the user.
+    Output:
+    {
+      "summary": "short summary for the day card",
+      "agent_message": "natural language explanation for the chat bubble"
+    }
+    """
+    runner = get_runner(
+        model_name="gemini-2.0-flash",
+        instruction=instruction,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
+        tracer_name="AdjustMessage"
+    )
+    workout_details = target_day.get("workout_details") or {}
+    current_title = target_day.get("activity")
+    current_duration = workout_details.get("duration_mins")
+    current_focus = workout_details.get("focus")
+    proposed_title = None
+    proposed_duration = None
+    proposed_focus = None
+    if selected_workout:
+        proposed_title = selected_workout.get("display_title") or selected_workout.get("title")
+        proposed_duration = selected_workout.get("duration_mins")
+        proposed_focus = selected_workout.get("focus")
+    payload = {
+        "user_message": user_message,
+        "day_index": day_index,
+        "weekly_goal": current_plan.get("weekly_focus"),
+        "current": {
+            "title": current_title,
+            "duration_mins": current_duration,
+            "focus": current_focus,
+        },
+        "proposal": {
+            "is_rest": is_rest,
+            "title": proposed_title if not is_rest else "Rest",
+            "duration_mins": proposed_duration if not is_rest else None,
+            "focus": proposed_focus if not is_rest else [],
+        },
+        "constraints": {
+            "requested_max_duration": max_duration,
+            "requested_min_duration": min_duration,
+        },
+    }
+    prompt = json.dumps(payload)
+    try:
+        parts = [types.Part(text=prompt)]
+        content = await run_agent(runner, parts)
+        text_resp = extract_text_from_content(content)
+        clean_text = text_resp.replace("```json", "").replace("```", "").strip()
+        data = json.loads(clean_text)
+        if isinstance(data, list):
+            data = data[0]
+        summary = str(data.get("summary") or "Updated workout.")
+        agent_message = str(data.get("agent_message") or "Updated your plan.")
+        return {"summary": summary, "agent_message": agent_message}
+    except Exception:
+        if is_rest:
+            return {
+                "summary": "Marked as rest day.",
+                "agent_message": f"You sound tired, so I'm suggesting a rest day for Day {day_index} to help you recover.",
+            }
+        return {
+            "summary": "Updated workout.",
+            "agent_message": "Updated your plan with a better fit.",
+        }
+def _extract_desired_focus(message: str) -> List[str]:
+    text = (message or "").lower()
+    focus: List[str] = []
+    if "leg" in text:
+        focus.append("legs")
+    if "glute" in text:
+        focus.append("glutes")
+    if "upper body" in text:
+        focus.append("upper body")
+    if "lower body" in text:
+        focus.append("lower body")
+    if "core" in text or "abs" in text:
+        focus.append("core")
+    if "back" in text:
+        focus.append("back")
+    if "chest" in text:
+        focus.append("chest")
+    if "bicep" in text:
+        focus.append("biceps")
+    if "tricep" in text:
+        focus.append("triceps")
+    if "shoulder" in text:
+        focus.append("shoulders")
+    if "arm" in text:
+        focus.append("arms")
+    if "cardio" in text:
+        focus.append("cardio")
+    if "hiit" in text:
+        focus.append("hiit")
+    if "full body" in text:
+        focus.append("full body")
+    if "general fitness" in text:
+        focus.append("general fitness")
     # Deduplicate while preserving order
     seen = set()
     result: List[str] = []
@@ -445,6 +588,28 @@ async def adjust_workout_multi_agent(
     durations = _parse_duration_request(user_message, current_duration)
     max_duration = durations.get("max_duration")
     min_duration = durations.get("min_duration")
+    if _is_rest_request(user_message):
+        message_data = await build_adjustment_message(
+            user_message,
+            day_index,
+            current_plan,
+            target_day,
+            None,
+            True,
+            max_duration,
+            min_duration,
+        )
+        return {
+            "success": True,
+            "new_workout_id": None,
+            "new_activity_title": "Rest",
+            "is_rest": True,
+            "summary": message_data["summary"],
+            "agent_response": message_data["agent_message"],
+            "selected_workout": None,
+            "requested_max_duration": max_duration,
+            "requested_min_duration": min_duration,
+        }
     query_text = await build_semantic_query_agent(
         user_message,
         intent,
@@ -519,33 +684,48 @@ async def adjust_workout_multi_agent(
             None
         )
     if not selected:
+        message_data = await build_adjustment_message(
+            user_message,
+            day_index,
+            current_plan,
+            target_day,
+            None,
+            True,
+            max_duration,
+            min_duration,
+        )
         return {
             "success": True,
             "new_workout_id": None,
             "new_activity_title": "Rest",
             "is_rest": True,
-            "summary": "Marked as rest day.",
-            "agent_response": "I couldn't find a suitable match, so I set this as a rest day.",
+            "summary": message_data["summary"],
+            "agent_response": message_data["agent_message"],
             "selected_workout": None,
             "requested_max_duration": max_duration,
-            "requested_min_duration": min_duration
+            "requested_min_duration": min_duration,
         }
     selected["thumbnail"] = _normalize_media_url(selected.get("thumbnail"))
     selected["url"] = _normalize_media_url(selected.get("url"))
     activity_title = selected.get("display_title") or selected.get("title")
-    summary = "Updated workout."
-    if max_duration:
-        summary = f"Switched to a shorter workout (~{selected.get('duration_mins')} min)."
-    elif min_duration:
-        summary = f"Switched to a longer workout (~{selected.get('duration_mins')} min)."
+    message_data = await build_adjustment_message(
+        user_message,
+        day_index,
+        current_plan,
+        target_day,
+        selected,
+        False,
+        max_duration,
+        min_duration,
+    )
     return {
         "success": True,
         "new_workout_id": selected.get("id"),
         "new_activity_title": activity_title,
         "is_rest": False,
-        "summary": summary,
-        "agent_response": "Updated your plan with a better fit.",
+        "summary": message_data["summary"],
+        "agent_response": message_data["agent_message"],
         "selected_workout": selected,
         "requested_max_duration": max_duration,
-        "requested_min_duration": min_duration
+        "requested_min_duration": min_duration,
     }

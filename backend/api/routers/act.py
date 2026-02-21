@@ -113,89 +113,10 @@ async def chat_agent(
                         "updated_plan": current_plan
                     }
                 else:
-                    selected_workout = adjustment_result.get("selected_workout") or {}
-                    requested_max = adjustment_result.get("requested_max_duration")
-                    requested_min = adjustment_result.get("requested_min_duration")
-                    proposed_title = (
-                        adjustment_result.get("new_activity_title")
-                        or selected_workout.get("display_title")
-                        or selected_workout.get("title")
-                        or target_day.get("activity")
-                        or "this workout"
-                    )
-                    proposed_duration = selected_workout.get("duration_mins")
-                    focus_list = selected_workout.get("focus") or []
-                    focus_text = ""
-                    if isinstance(focus_list, list) and focus_list:
-                        focus_text = ", ".join(str(f) for f in focus_list)
-                    elif isinstance(focus_list, str) and focus_list:
-                        focus_text = focus_list
-                    is_rest = adjustment_result.get("is_rest", False)
-                    if is_rest:
-                        response_text = (
-                            f"I couldn't find a workout that fits your request well for Day {day_index}. "
-                            f"One option is to make it a rest day so your body can recover. "
-                            f"Are you okay if I change Day {day_index} to a rest day?"
-                        )
-                    else:
-                        if isinstance(proposed_duration, (int, float)):
-                            if isinstance(requested_max, (int, float)) and proposed_duration > requested_max:
-                                base = (
-                                    f"I don't have any workouts under {int(requested_max)} minutes that fit this day."
-                                )
-                                extra = ""
-                                if focus_text:
-                                    extra = (
-                                        f" The closest I have is \"{proposed_title}\" which focuses on {focus_text} "
-                                        f"and is about {int(proposed_duration)} minutes."
-                                    )
-                                else:
-                                    extra = (
-                                        f" The closest I have is \"{proposed_title}\" which is about {int(proposed_duration)} minutes."
-                                    )
-                                response_text = (
-                                    base + extra + f" Are you okay if I update Day {day_index} to this?"
-                                )
-                            elif isinstance(requested_min, (int, float)) and proposed_duration < requested_min:
-                                base = (
-                                    f"I don't have any workouts at or above {int(requested_min)} minutes that fit this day."
-                                )
-                                extra = ""
-                                if focus_text:
-                                    extra = (
-                                        f" The closest I have is \"{proposed_title}\" which focuses on {focus_text} "
-                                        f"and is about {int(proposed_duration)} minutes."
-                                    )
-                                else:
-                                    extra = (
-                                        f" The closest I have is \"{proposed_title}\" which is about {int(proposed_duration)} minutes."
-                                    )
-                                response_text = (
-                                    base + extra + f" Are you okay if I update Day {day_index} to this?"
-                                )
-                            else:
-                                if focus_text:
-                                    response_text = (
-                                        f"Got it. I can switch Day {day_index} to \"{proposed_title}\" "
-                                        f"which focuses on {focus_text} and is about {int(proposed_duration)} minutes. "
-                                        f"Are you okay if I update this day?"
-                                    )
-                                else:
-                                    response_text = (
-                                        f"Got it. I can switch Day {day_index} to \"{proposed_title}\" "
-                                        f"which is about {int(proposed_duration)} minutes. "
-                                        f"Are you okay if I update this day?"
-                                    )
-                        else:
-                            response_text = (
-                                f"Got it. I have a workout called \"{proposed_title}\" that I think fits "
-                                f"what you asked for on Day {day_index}. Are you okay if I update "
-                                f"Day {day_index} to this?"
-                            )
                     return {
                         "status": "proposal",
                         "action": "ADJUST_WORKOUT",
-                        "response_text": response_text,
+                        "response_text": adjustment_result['agent_response'],
                         "summary": adjustment_result['summary'],
                         "updated_day": updated_day_data,
                         "updated_plan": current_plan,
