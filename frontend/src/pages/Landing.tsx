@@ -169,14 +169,6 @@ const Landing: React.FC = () => {
                       <span className="text-orange-500">35 min</span>
                     </div>
 
-                    {/* Note Box */}
-                    <div className="bg-[#3a3a3c] rounded-2xl p-4 mb-6 flex gap-3 border border-white/5">
-                      <AlertCircle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
-                      <p className="text-xs text-gray-300 italic leading-relaxed">
-                        Kicking off the week with a full body workout to engage all major muscle groups and build a solid foundation for the week's activities.
-                      </p>
-                    </div>
-
                     {/* Actions */}
                     <div className="space-y-5">
                       <div>

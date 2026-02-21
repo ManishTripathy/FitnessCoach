@@ -714,13 +714,6 @@ function WorkoutCard({
                   <span>{day.duration}</span>
                 </div>
 
-                {day.notes && (
-                  <div className="flex items-start gap-2 mb-4 bg-white/5 p-3 rounded-lg border border-white/5">
-                     <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
-                     <p className="text-white/80 text-xs font-sans italic">{day.notes}</p>
-                  </div>
-                )}
-
                 {/* Quick Feedback Section - Mobile Responsive */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mt-3 pt-3 border-t border-white/5">
                   <div className="flex items-center gap-2">
