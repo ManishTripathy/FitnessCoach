@@ -609,45 +609,43 @@ function WorkoutCard({
           </div>
         )}
 
-        {/* Ryan Chat Head - Only for non-rest days */}
-        {!day.isRestDay && (
-          <div className="absolute top-4 right-4 z-10 flex flex-col items-end">
-            {showGuide && (
-              <div className="mb-2 mr-0 animate-bounce">
-                <div className="bg-orange-500 text-white px-4 py-2 rounded-xl rounded-tr-none text-xs font-bold font-sans shadow-xl whitespace-nowrap border border-white/20 relative">
-                  Need adjustments? Chat with me! 💪
-                  <div className="absolute -bottom-1 right-0 w-2 h-2 bg-orange-500 rotate-45"></div>
-                </div>
+        {/* Ryan Chat Head */}
+        <div className="absolute top-4 right-4 z-10 flex flex-col items-end">
+          {showGuide && !day.isRestDay && (
+            <div className="mb-2 mr-0 animate-bounce">
+              <div className="bg-orange-500 text-white px-4 py-2 rounded-xl rounded-tr-none text-xs font-bold font-sans shadow-xl whitespace-nowrap border border-white/20 relative">
+                Need adjustments? Chat with me! 💪
+                <div className="absolute -bottom-1 right-0 w-2 h-2 bg-orange-500 rotate-45"></div>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onChatToggle(day.id);
+            }}
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all ${
+              isActiveChatDay
+                ? 'bg-gradient-to-br from-orange-600 to-red-600 scale-110 ring-4 ring-orange-500/50'
+                : 'bg-gradient-to-br from-orange-500 to-red-500 hover:scale-110'
+            }`}
+            style={{ cursor: 'pointer' }}
+          >
+            {isActiveChatDay ? (
+              <div className="relative">
+                <MessageCircle className="w-5 h-5" fill="white" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
+              </div>
+            ) : (
+              <div className="relative">
+                <MessageCircle className="w-5 h-5" />
+                {showGuide && !day.isRestDay && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white animate-ping"></div>
+                )}
               </div>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onChatToggle(day.id);
-              }}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all ${
-                isActiveChatDay
-                  ? 'bg-gradient-to-br from-orange-600 to-red-600 scale-110 ring-4 ring-orange-500/50'
-                  : 'bg-gradient-to-br from-orange-500 to-red-500 hover:scale-110'
-              }`}
-              style={{ cursor: 'pointer' }}
-            >
-              {isActiveChatDay ? (
-                <div className="relative">
-                  <MessageCircle className="w-5 h-5" fill="white" />
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
-                </div>
-              ) : (
-                <div className="relative">
-                  <MessageCircle className="w-5 h-5" />
-                  {showGuide && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full border-2 border-white animate-ping"></div>
-                  )}
-                </div>
-              )}
-            </button>
-          </div>
-        )}
+          </button>
+        </div>
 
         <div className="flex flex-col sm:flex-row items-start gap-4">
           {/* Drag Handle - Hidden on mobile */}
