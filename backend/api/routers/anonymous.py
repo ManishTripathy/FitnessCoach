@@ -325,6 +325,8 @@ async def anonymous_chat_agent(request: AnonymousChatRequest):
         }
 
         intent_data = await detect_intent_multi_agent(request.message, context)
+        if not isinstance(intent_data, dict):
+            intent_data = {"intent": "OTHER"}
         intent = str(intent_data.get("intent", "OTHER")).upper()
 
         if intent == "ADJUST_WORKOUT":
@@ -335,7 +337,7 @@ async def anonymous_chat_agent(request: AnonymousChatRequest):
                 intent_data,
             )
 
-            if adjustment_result.get("success"):
+            if isinstance(adjustment_result, dict) and adjustment_result.get("success"):
                 new_schedule = []
                 updated_day_data = None
 
@@ -386,7 +388,7 @@ async def anonymous_chat_agent(request: AnonymousChatRequest):
             else:
                 return {
                     "status": "error",
-                    "response_text": adjustment_result.get("agent_response", "Failed to adjust."),
+                    "response_text": (adjustment_result or {}).get("agent_response", "Failed to adjust."),
                 }
 
         return {

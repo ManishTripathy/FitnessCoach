@@ -329,13 +329,13 @@ async def detect_intent_multi_agent(message: str, context: Dict[str, Any]) -> Di
     You are an intent classifier for a fitness coach AI.
     You must output ONLY JSON.
     Classify the intent into one of these categories:
-    - ADJUST_WORKOUT: User wants to change duration, difficulty, or swap the workout.
-      Examples: "too hard", "only have 20 mins", "change this", "Between 10 to 15 mins please", "shorter", "longer".
+    - ADJUST_WORKOUT: User wants to change duration, difficulty, or swap the workout, or is asking you to suggest a different workout for this day.
+      Examples: "too hard", "only have 20 mins", "change this", "Between 10 to 15 mins please", "shorter", "longer", "suggest a full body hiit workout", "give me a different workout", "swap this for legs and glutes".
     - EXPLAIN_WORKOUT: User asks about the workout details or technique.
       Examples: "what is this?", "how to do pushups", "explain the focus".
     - MOTIVATION: User seeks encouragement.
     - OTHER: Anything else.
-
+    
     Output JSON:
     {
       "intent": "ADJUST_WORKOUT|EXPLAIN_WORKOUT|MOTIVATION|OTHER"
@@ -357,6 +357,8 @@ async def detect_intent_multi_agent(message: str, context: Dict[str, Any]) -> Di
     Current Focus: {context.get('current_focus')}
     """
     
+    text_lower = (message or "").lower()
+    base_intent = "OTHER"
     try:
         parts = [types.Part(text=prompt)]
         content = await run_agent(runner, parts)
@@ -365,9 +367,18 @@ async def detect_intent_multi_agent(message: str, context: Dict[str, Any]) -> Di
         result = json.loads(clean_text)
         if isinstance(result, list):
             result = result[0]
-        return result
+        if isinstance(result, dict):
+            base_intent = str(result.get("intent", "OTHER")).upper()
     except Exception:
-        return {"intent": "OTHER"}
+        base_intent = "OTHER"
+    
+    if base_intent == "OTHER":
+        if any(word in text_lower for word in ["suggest", "recommend", "workout", "hiit", "full body"]):
+            base_intent = "ADJUST_WORKOUT"
+        elif any(word in text_lower for word in ["motivate", "motivation", "encourage", "inspire"]):
+            base_intent = "MOTIVATION"
+    
+    return {"intent": base_intent}
 
 def _parse_duration_request(message: str, current_duration: Optional[int]) -> Dict[str, Optional[int]]:
     text = (message or "").lower()
