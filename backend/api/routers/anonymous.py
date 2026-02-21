@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
 import uuid
@@ -7,6 +8,7 @@ from datetime import datetime, timedelta
 from firebase_admin import firestore
 from backend.services.firebase_service import save_anonymous_session, get_anonymous_session, delete_anonymous_session, get_bucket, get_db, download_file_as_bytes
 from backend.services.ai_service import analyze_body_image, generate_future_physique, recommend_fitness_path, generate_weekly_plan_rag
+from backend.services.ai.agent import detect_intent_multi_agent, adjust_workout_multi_agent
 from backend.services.mock_service import try_get_mock_plan, try_get_mock_analyze, try_get_mock_generate, try_get_mock_suggest
 from backend.core.deps import verify_firebase_token
 from backend.core.config import settings
@@ -25,6 +27,11 @@ class PlanRequest(BaseModel):
 
 class MigrateRequest(BaseModel):
     session_id: str
+
+class AnonymousChatRequest(BaseModel):
+    message: str
+    day_id: str
+    current_plan: dict
 
 @router.post("/upload")
 async def upload_anonymous_photo(file: UploadFile = File(...), session_id: str = Form(None)):
@@ -274,6 +281,95 @@ async def generate_anonymous_plan(request: PlanRequest):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/chat")
+async def anonymous_chat_agent(request: AnonymousChatRequest):
+    try:
+        day_match = re.search(r'day-(\d+)', request.day_id)
+        if not day_match:
+            raise HTTPException(status_code=400, detail="Invalid day_id format")
+        day_index = int(day_match.group(1))
+
+        current_plan = request.current_plan or {}
+        schedule = current_plan.get("schedule") or []
+        if not schedule:
+            raise HTTPException(status_code=400, detail="current_plan.schedule is required")
+
+        target_day = next((d for d in schedule if d.get("day") == day_index), None)
+        workout_details = target_day.get("workout_details") if target_day else {}
+        context = {
+            "day_index": day_index,
+            "workout_title": target_day.get("activity") if target_day else "Unknown",
+            "current_duration_mins": (workout_details or {}).get("duration_mins"),
+            "current_focus": (workout_details or {}).get("focus"),
+        }
+
+        intent_data = await detect_intent_multi_agent(request.message, context)
+        intent = str(intent_data.get("intent", "OTHER")).upper()
+
+        if intent == "ADJUST_WORKOUT":
+            adjustment_result = await adjust_workout_multi_agent(
+                request.message,
+                day_index,
+                current_plan,
+                intent_data,
+            )
+
+            if adjustment_result.get("success"):
+                new_schedule = []
+                updated_day_data = None
+
+                for day in current_plan.get("schedule", []):
+                    if day.get("day") == day_index:
+                        day["is_rest"] = adjustment_result["is_rest"]
+                        day["workout_id"] = adjustment_result["new_workout_id"]
+                        selected_workout = adjustment_result.get("selected_workout") or {}
+                        day["activity"] = (
+                            adjustment_result.get("new_activity_title")
+                            or selected_workout.get("display_title")
+                            or selected_workout.get("title")
+                            or day.get("activity")
+                        )
+                        day["notes"] = adjustment_result["summary"]
+
+                        if not day["is_rest"] and day["workout_id"]:
+                            day["workout_details"] = selected_workout
+                        else:
+                            day["workout_details"] = None
+                            if not day.get("activity"):
+                                day["activity"] = "Rest"
+
+                        updated_day_data = day
+                    new_schedule.append(day)
+
+                current_plan["schedule"] = new_schedule
+
+                return {
+                    "status": "success",
+                    "action": "ADJUST_WORKOUT",
+                    "response_text": adjustment_result["agent_response"],
+                    "summary": adjustment_result["summary"],
+                    "updated_day": updated_day_data,
+                    "updated_plan": current_plan,
+                }
+            else:
+                return {
+                    "status": "error",
+                    "response_text": adjustment_result.get("agent_response", "Failed to adjust."),
+                }
+
+        return {
+            "status": "success",
+            "action": "chat",
+            "response_text": "I can currently help with adjusting your workout plan (for example, 'make it shorter' or 'too hard').",
+            "summary": None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Anonymous chat error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/migrate")

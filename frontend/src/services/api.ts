@@ -120,6 +120,22 @@ export const anonymousApi = {
     }
 
     return response.json();
+  },
+
+  chatWithAgent: async (message: string, dayId: string, currentPlan: any): Promise<any> => {
+    const response = await fetch(`${API_BASE}/anonymous/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message, day_id: dayId, current_plan: currentPlan }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Chat failed');
+    }
+
+    return response.json();
   }
 };
 

@@ -392,7 +392,31 @@ function WorkoutCard({
     setMessages(prev => [...prev, newMessage]);
     
     try {
-      const result = await actApi.chatWithAgent(text, day.id);
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      let result: any;
+
+      if (user) {
+        result = await actApi.chatWithAgent(text, day.id);
+      } else {
+        const currentPlan = {
+          weekly_focus: 'General Fitness',
+          schedule: [
+            {
+              day: day.day,
+              day_name: `Day ${day.day}`,
+              is_rest: day.isRestDay,
+              workout_id: null,
+              activity: day.title,
+              workout_details: null,
+              notes: day.notes,
+            },
+          ],
+        };
+
+        result = await anonymousApi.chatWithAgent(text, day.id, currentPlan);
+      }
       
       if (result.status === 'success') {
         const agentMsg: ChatMessage = {
